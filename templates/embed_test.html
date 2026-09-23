@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Embed Test — A Totally Unrelated Website</title>
+<style>
+  body { font-family: Georgia, serif; background: #fffdf7; color: #3a3a3a; padding: 60px; max-width: 700px; margin: 0 auto; }
+  h1 { color: #2c5f2d; }
+  .note {
+    background: #eaf5ea; border: 1px solid #97c9a0; border-radius: 8px; padding: 16px; margin: 24px 0;
+    font-family: -apple-system, sans-serif; font-size: 14px;
+  }
+  code {
+    background: #f0f0f0; padding: 3px 8px; border-radius: 4px; font-size: 13px; display: block; margin-top: 8px;
+  }
+</style>
+</head>
+<body>
+  <h1>🌼 A Completely Different Website</h1>
+  <p>This page has nothing to do with laundry — it's deliberately styled differently (serif font, green/cream colors)
+  to prove the chatbot widget below works on ANY website, regardless of its existing design.</p>
+
+  <div class="note">
+    ✅ <strong>This page loads the chatbot using a single script tag</strong> — no other code changes.
+    <code>&lt;script src="/widget.js"&gt;&lt;/script&gt;</code>
+  </div>
+
+  <p>Scroll down, or just look at the bottom-right corner of your screen — the chat bubble should appear there,
+  fully functional, styled independently of this page's fonts/colors.</p>
+
+  <!-- THIS IS THE ONLY LINE NEEDED TO EMBED THE CHATBOT -->
+  <script src="/widget.js"></script>
+</body>
+</html>

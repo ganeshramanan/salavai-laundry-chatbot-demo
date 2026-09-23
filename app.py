@@ -13,12 +13,25 @@ proving the same free/local retrieval technique has real commercial value,
 not just educational value.
 """
 
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, send_from_directory
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
 
 app = Flask(__name__)
+
+
+@app.after_request
+def add_cors_headers(response):
+    """
+    Allow this API to be called from any origin -- required so the embeddable
+    widget.js can run on a completely different domain (e.g. thesalavailaundry.com)
+    while calling this Flask backend hosted elsewhere (e.g. onrender.com).
+    """
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+    return response
 
 # Knowledge base built from the business's actual site content (FAQs + pricing info).
 # In a real deployment, this would be edited by the business owner or scraped from their site.
@@ -92,6 +105,23 @@ def get_faq_answer(user_question, threshold=0.15):
 @app.route("/")
 def index():
     return render_template("index.html")
+
+
+@app.route("/widget.js")
+def widget_js():
+    """
+    Serves the embeddable widget script. Any website can load this via:
+    <script src="https://<this-app>.onrender.com/widget.js"></script>
+    """
+    response = send_from_directory("static", "widget.js", mimetype="application/javascript")
+    response.headers["Cache-Control"] = "public, max-age=300"  # allow some caching, but refresh every 5 min
+    return response
+
+
+@app.route("/embed-test")
+def embed_test():
+    """A mock 'third-party website' page proving the widget works when loaded cross-origin."""
+    return render_template("embed_test.html")
 
 
 @app.route("/api/chat", methods=["POST"])
