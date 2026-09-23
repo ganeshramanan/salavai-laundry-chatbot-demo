@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Admin Login — Chatbot Console</title>
+<style>
+  body {
+    font-family: -apple-system, sans-serif; background: #14324f; height: 100vh;
+    display: flex; align-items: center; justify-content: center; margin: 0;
+  }
+  .box { background: #fff; padding: 40px; border-radius: 12px; width: 320px; text-align: center; }
+  h1 { font-size: 18px; margin-bottom: 20px; color: #14324f; }
+  input {
+    width: 100%; padding: 10px 14px; border: 1px solid #ddd; border-radius: 8px; margin-bottom: 12px;
+    font-size: 14px; box-sizing: border-box;
+  }
+  button {
+    width: 100%; padding: 10px; background: #a41e22; color: #fff; border: none; border-radius: 8px;
+    font-weight: 700; cursor: pointer;
+  }
+  .error { color: #a41e22; font-size: 12px; margin-bottom: 10px; }
+</style>
+</head>
+<body>
+  <div class="box">
+    <h1>🔐 Admin Console Login</h1>
+    {% if error %}<div class="error">{{ error }}</div>{% endif %}
+    <form method="POST">
+      <input type="password" name="password" placeholder="Enter admin password" autofocus>
+      <button type="submit">Log In</button>
+    </form>
+  </div>
+</body>
+</html>

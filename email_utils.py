@@ -22,23 +22,25 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 
-def send_lead_notification(lead_data):
+def send_lead_notification(lead_data, notify_emails=None):
     """
     Sends an email notification when a new franchise lead is captured.
     Fails silently (logs to console) if SMTP env vars aren't configured --
     so the chatbot itself never breaks even if email isn't set up yet.
 
-    NOTIFY_EMAIL supports multiple recipients as a comma-separated string,
-    e.g. "owner@example.com, partner@example.com"
+    notify_emails: list of recipient email addresses. If not provided, falls
+    back to the NOTIFY_EMAIL environment variable (comma-separated).
     """
     smtp_email = os.environ.get("SMTP_EMAIL")
     smtp_password = os.environ.get("SMTP_APP_PASSWORD")
-    notify_email_raw = os.environ.get("NOTIFY_EMAIL", smtp_email or "")
-    notify_emails = [e.strip() for e in notify_email_raw.split(",") if e.strip()]
+
+    if notify_emails is None:
+        notify_email_raw = os.environ.get("NOTIFY_EMAIL", smtp_email or "")
+        notify_emails = [e.strip() for e in notify_email_raw.split(",") if e.strip()]
 
     if not smtp_email or not smtp_password or not notify_emails:
         print("[email_utils] SMTP not configured -- skipping email notification. "
-              "Set SMTP_EMAIL, SMTP_APP_PASSWORD, and NOTIFY_EMAIL env vars to enable.")
+              "Set SMTP_EMAIL, SMTP_APP_PASSWORD env vars and add recipient emails to enable.")
         return False
 
     subject = f"🧺 New Franchise Lead: {lead_data.get('name', 'Unknown')}"

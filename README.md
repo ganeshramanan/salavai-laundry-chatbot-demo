@@ -60,6 +60,19 @@ This project sends an email automatically whenever a franchise lead completes th
 
 If these environment variables aren't set, the chatbot still works normally — it just skips sending the email (fails silently, logs a message instead of crashing).
 
+## Admin Console
+
+A password-protected admin page lets the business owner manage the bot without touching any code:
+
+**URL**: `/admin` (redirects to `/admin/login` if not logged in)
+
+**Default password**: `salavai123` — **change this immediately** by setting the `ADMIN_PASSWORD` environment variable on Render.
+
+### What the admin console can do
+1. **Upload a Word (.docx) or PDF document** to add new knowledge to the bot — it automatically extracts the text, splits it into chunks, and makes it searchable immediately (no redeploy needed)
+2. **Manage notification emails** — add/remove which email addresses receive franchise lead alerts, directly from the browser (no need to edit Render environment variables each time)
+3. **View captured leads** — a readable table of every franchise inquiry captured so far
+
 ## Business case for the owner
 - **Faster answers** for the most common question (pricing) without waiting for WhatsApp replies
 - **Better franchise lead quality** — pre-qualified with city, experience, and budget before a human spends time following up

@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin Console — Salavai Laundry Chatbot</title>
+<style>
+  :root { --primary: #a41e22; --dark: #14324f; --bg: #f7f8fa; }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, sans-serif; background: var(--bg); margin: 0; color: #1a1a1a; }
+  header {
+    background: var(--dark); color: #fff; padding: 20px 32px; display: flex;
+    justify-content: space-between; align-items: center;
+  }
+  header h1 { font-size: 18px; margin: 0; }
+  header a { color: #ffd166; font-size: 13px; text-decoration: none; }
+  .wrap { max-width: 900px; margin: 32px auto; padding: 0 24px; }
+  .card { background: #fff; border-radius: 12px; padding: 24px; margin-bottom: 24px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+  .card h2 { font-size: 16px; margin-top: 0; margin-bottom: 6px; }
+  .card .sub { font-size: 13px; color: #6b7280; margin-bottom: 16px; }
+  .stat { font-size: 28px; font-weight: 800; color: var(--primary); }
+
+  input[type="text"], textarea {
+    width: 100%; padding: 10px 14px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px;
+    margin-bottom: 12px;
+  }
+  input[type="file"] { margin-bottom: 12px; }
+  button {
+    background: var(--primary); color: #fff; border: none; padding: 10px 20px; border-radius: 8px;
+    font-weight: 700; cursor: pointer; font-size: 13px;
+  }
+  button:hover { opacity: 0.9; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 8px; border-bottom: 1px solid #eee; }
+  th { color: #6b7280; font-size: 11px; text-transform: uppercase; }
+  .empty { color: #6b7280; font-size: 13px; padding: 16px 0; text-align: center; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🛠 Salavai Laundry — Chatbot Admin Console</h1>
+  <a href="/admin/logout">Log out</a>
+</header>
+
+<div class="wrap">
+
+  <div class="card">
+    <h2>📚 Knowledge Base</h2>
+    <div class="sub">The bot currently knows <span class="stat">{{ kb_count }}</span> pieces of content.</div>
+    <form action="/admin/upload" method="POST" enctype="multipart/form-data">
+      <label style="font-size:13px; font-weight:600;">Upload a Word (.docx) or PDF document to add more knowledge:</label><br><br>
+      <input type="file" name="document" accept=".docx,.pdf" required>
+      <button type="submit">Upload & Train Bot</button>
+    </form>
+  </div>
+
+  <div class="card">
+    <h2>📧 Notification Emails</h2>
+    <div class="sub">These addresses receive an email every time a franchise lead completes the chat flow. Separate multiple emails with commas.</div>
+    <form action="/admin/emails" method="POST">
+      <input type="text" name="emails" value="{{ emails|join(', ') }}" placeholder="e.g. owner@example.com, partner@example.com">
+      <button type="submit">Save Emails</button>
+    </form>
+  </div>
+
+  <div class="card">
+    <h2>🧾 Captured Franchise Leads</h2>
+    <div class="sub">Total leads: <strong>{{ leads|length }}</strong></div>
+    {% if leads|length > 0 %}
+    <table>
+      <thead><tr><th>Name</th><th>City</th><th>Experience</th><th>Budget</th></tr></thead>
+      <tbody>
+        {% for lead in leads %}
+        <tr>
+          <td>{{ lead.name }}</td>
+          <td>{{ lead.city }}</td>
+          <td>{{ lead.experience }}</td>
+          <td>{{ lead.budget }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+      <div class="empty">No leads captured yet.</div>
+    {% endif %}
+  </div>
+
+</div>
+</body>
+</html>
