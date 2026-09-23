@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Salavai Laundry — Chatbot Demo</title>
+<style>
+  :root {
+    --primary: #a41e22; --dark: #14324f; --bg: #f7f8fa; --text: #1a1a1a; --text-dim: #6b7280;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); }
+
+  /* Mock site header, to show this is an embeddable widget on any site */
+  .mock-header {
+    background: #fff; padding: 20px 40px; display: flex; justify-content: space-between;
+    align-items: center; border-bottom: 1px solid #e5e7eb;
+  }
+  .mock-logo { font-weight: 800; color: var(--dark); font-size: 18px; }
+  .mock-logo span { color: var(--primary); }
+  .mock-nav { display: flex; gap: 24px; font-size: 14px; color: var(--text-dim); }
+
+  .demo-banner {
+    background: var(--dark); color: #fff; text-align: center; padding: 12px; font-size: 13px;
+  }
+  .demo-banner strong { color: #ffd166; }
+
+  .mock-hero {
+    max-width: 900px; margin: 60px auto; text-align: center; padding: 0 24px;
+  }
+  .mock-hero h1 { font-size: 34px; color: var(--dark); margin-bottom: 12px; }
+  .mock-hero p { color: var(--text-dim); font-size: 16px; }
+
+  .try-hint {
+    text-align: center; margin-top: 40px; font-size: 14px; color: var(--text-dim);
+  }
+  .try-hint .arrow { font-size: 24px; }
+
+  /* Floating chat widget */
+  .chat-bubble {
+    position: fixed; bottom: 24px; right: 24px; width: 60px; height: 60px; border-radius: 50%;
+    background: var(--primary); color: #fff; display: flex; align-items: center; justify-content: center;
+    font-size: 26px; cursor: pointer; box-shadow: 0 4px 20px rgba(164,30,34,0.4); z-index: 1000;
+    transition: transform .2s;
+  }
+  .chat-bubble:hover { transform: scale(1.08); }
+
+  .chat-window {
+    position: fixed; bottom: 96px; right: 24px; width: 360px; height: 520px;
+    background: #fff; border-radius: 16px; box-shadow: 0 8px 40px rgba(0,0,0,0.2);
+    display: none; flex-direction: column; overflow: hidden; z-index: 1000;
+  }
+  .chat-window.open { display: flex; }
+
+  .chat-header {
+    background: var(--dark); color: #fff; padding: 16px; font-weight: 700; font-size: 14px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .chat-header .sub { font-size: 11px; color: #a8b8c8; font-weight: 400; margin-top: 2px; }
+  .close-btn { cursor: pointer; font-size: 18px; opacity: 0.8; }
+  .close-btn:hover { opacity: 1; }
+
+  .chat-messages {
+    flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 10px;
+    background: #f9fafb;
+  }
+  .msg { max-width: 85%; padding: 10px 14px; border-radius: 12px; font-size: 13px; line-height: 1.5; white-space: pre-line; }
+  .msg.bot { background: #fff; border: 1px solid #e5e7eb; align-self: flex-start; }
+  .msg.user { background: var(--primary); color: #fff; align-self: flex-end; }
+
+  .quick-replies { display: flex; gap: 6px; flex-wrap: wrap; padding: 0 16px 10px; }
+  .quick-reply {
+    font-size: 11px; border: 1px solid var(--primary); color: var(--primary); background: #fff;
+    padding: 6px 10px; border-radius: 14px; cursor: pointer;
+  }
+  .quick-reply:hover { background: var(--primary); color: #fff; }
+
+  .chat-input-row { display: flex; gap: 8px; padding: 12px; border-top: 1px solid #e5e7eb; }
+  .chat-input-row input {
+    flex: 1; border: 1px solid #e5e7eb; border-radius: 20px; padding: 10px 14px; font-size: 13px;
+  }
+  .chat-input-row input:focus { outline: none; border-color: var(--primary); }
+  .chat-input-row button {
+    background: var(--primary); color: #fff; border: none; border-radius: 50%; width: 38px; height: 38px;
+    cursor: pointer; font-size: 14px;
+  }
+</style>
+</head>
+<body>
+
+<div class="demo-banner">
+  🧪 <strong>Chatbot Demo</strong> — built to show how an AI assistant widget could work on thesalavailaundry.com
+</div>
+
+<div class="mock-header">
+  <div class="mock-logo">The <span>Salavai</span> Laundry</div>
+  <div class="mock-nav">
+    <span>Our Stores</span><span>Home</span><span>About Us</span><span>Business Partner Program</span>
+  </div>
+</div>
+
+<div class="mock-hero">
+  <h1>Laundry for Every Home</h1>
+  <p>This is a mock version of the homepage — the real widget would sit on top of the actual website, no design changes needed.</p>
+</div>
+
+<div class="try-hint">
+  <div class="arrow">↘️</div>
+  Click the chat bubble in the bottom-right to try it
+</div>
+
+<!-- Floating chat widget -->
+<div class="chat-bubble" id="chatBubble">💬</div>
+
+<div class="chat-window" id="chatWindow">
+  <div class="chat-header">
+    <div>
+      Salavai Laundry Assistant
+      <div class="sub">Ask about pricing, pickup, or franchise opportunities</div>
+    </div>
+    <div class="close-btn" id="closeBtn">✕</div>
+  </div>
+  <div class="chat-messages" id="chatMessages">
+    <div class="msg bot">👋 Hi! I can help with pricing, pickup, turnaround time, or becoming a business partner. What would you like to know?</div>
+  </div>
+  <div class="quick-replies">
+    <div class="quick-reply" onclick="sendQuickReply('What is KG Laundry pricing?')">KG Laundry pricing</div>
+    <div class="quick-reply" onclick="sendQuickReply('How does pickup work?')">Pickup process</div>
+    <div class="quick-reply" onclick="sendQuickReply('I want to become a franchise partner')">Become a partner</div>
+  </div>
+  <div class="chat-input-row">
+    <input type="text" id="chatInput" placeholder="Type your question..." onkeypress="handleEnter(event)">
+    <button onclick="sendMessage()">➤</button>
+  </div>
+</div>
+
+<script>
+  let sessionState = {};
+
+  const chatBubble = document.getElementById("chatBubble");
+  const chatWindow = document.getElementById("chatWindow");
+  const closeBtn = document.getElementById("closeBtn");
+
+  chatBubble.addEventListener("click", () => chatWindow.classList.add("open"));
+  closeBtn.addEventListener("click", () => chatWindow.classList.remove("open"));
+
+  function appendMessage(text, sender) {
+    const container = document.getElementById("chatMessages");
+    const div = document.createElement("div");
+    div.className = "msg " + sender;
+    div.textContent = text;
+    container.appendChild(div);
+    container.scrollTop = container.scrollHeight;
+  }
+
+  function sendQuickReply(text) {
+    document.getElementById("chatInput").value = text;
+    sendMessage();
+  }
+
+  function handleEnter(e) {
+    if (e.key === "Enter") sendMessage();
+  }
+
+  function sendMessage() {
+    const input = document.getElementById("chatInput");
+    const message = input.value.trim();
+    if (!message) return;
+
+    appendMessage(message, "user");
+    input.value = "";
+
+    fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message, state: sessionState })
+    })
+      .then(res => res.json())
+      .then(data => {
+        appendMessage(data.reply, "bot");
+        sessionState = data.state || {};
+      });
+  }
+</script>
+
+</body>
+</html>
