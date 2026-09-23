@@ -74,9 +74,17 @@ KNOWLEDGE_BASE = [
     {"question": "What equipment and technology do you use?",
      "answer": "We use modern commercial laundry machines, LG wet cleaning technology, and eco-friendly "
                "cleaning chemicals -- the same standard trusted by hospitality and garment-care businesses."},
-    {"question": "How can I contact support?",
-     "answer": "You can reach us via WhatsApp/hotline, email, or the contact form on our website. "
+    {"question": "How can I contact support? What is your WhatsApp number, phone number, or email?",
+     "answer": "You can reach us via WhatsApp or phone at +91 6385550203, or email us at "
+               "contact@thesalavailaundry.com. Our main store is located at 2/658, East Coast Rd, "
+               "Ranga Reddy Gardens, Neelankarai, Chennai, Tamil Nadu 600115. "
                "Store hours are typically Mon-Sat 8 AM-8 PM, Sun 9 AM-5 PM."},
+    {"question": "What is the Self Income Generation Program (SIGP)?",
+     "answer": "The Self Income Generation Program (SIGP) empowers communities through professional "
+               "laundry entrepreneurship across Tamil Nadu. It's designed for dhobi families, "
+               "homemakers, and differently-abled individuals -- no prior business experience required. "
+               "You can submit an SIGP enquiry directly on our website with your background and "
+               "questions about capital, equipment, and training support."},
 ]
 
 vectorizer = None
