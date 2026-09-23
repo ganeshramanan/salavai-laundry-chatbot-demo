@@ -45,20 +45,20 @@ Currently, franchise leads are stored in memory (`franchise_leads` list) and vie
 - Save to a real database (not just in-memory)
 - Possibly integrate with a CRM or Google Sheet for easy follow-up
 
-## Setting up free email notifications
-This project sends an email automatically whenever a franchise lead completes the guided chat flow, using **Gmail's free SMTP relay** — no third-party service, no signup, no cost.
+## Setting up email notifications (via Resend)
+This project sends an email automatically whenever a franchise lead completes the guided chat flow, using **[Resend](https://resend.com)** — an HTTPS-based transactional email API. We switched from Gmail SMTP to Resend because Render's free tier blocks outbound SMTP ports (587/25), causing hung connections and worker crashes. Resend sends via a normal HTTPS API call, which is never blocked.
 
 ### One-time setup
-1. Use a Gmail account (a dedicated one like `salavaibot@gmail.com` is recommended, but any Gmail works)
-2. Enable **2-Step Verification** on that Google account (required for App Passwords)
-3. Generate an **App Password**: go to [myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords), create one for "Mail"
+1. Sign up at [resend.com](https://resend.com) (free tier: 100 emails/day, 3,000/month — plenty for lead notifications)
+2. Get an API key from the Resend dashboard
+3. Verify a sending domain in Resend (or use their default `onboarding@resend.dev` sender for quick testing, no domain verification needed)
 4. On Render, add these environment variables to the service:
-   - `SMTP_EMAIL` — the Gmail address sending notifications
-   - `SMTP_APP_PASSWORD` — the 16-character App Password from step 3 (NOT the normal Gmail password)
-   - `NOTIFY_EMAIL` — the email address that should receive lead notifications (can be the business owner's real inbox)
+   - `RESEND_API_KEY` — your Resend API key
+   - `RESEND_FROM` — the verified "from" address, e.g. `"Salavai Bot <notifications@yourdomain.com>"` (or leave unset to use the default test sender)
+   - `NOTIFY_EMAIL` — comma-separated recipient email addresses that should receive lead notifications
 5. Redeploy — new leads will now trigger an automatic email
 
-If these environment variables aren't set, the chatbot still works normally — it just skips sending the email (fails silently, logs a message instead of crashing).
+Email sending runs in a background thread with a timeout, so even if it fails or is slow, it can never block or crash the lead-capture flow. If these environment variables aren't set, the chatbot still works normally — it just skips sending the email (fails silently, logs a message instead of crashing).
 
 ## Admin Console
 

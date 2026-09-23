@@ -1,84 +1,87 @@
 """
-Free email notification helper using Gmail SMTP.
+Email notification helper using Resend (https://resend.com) -- an HTTPS-based
+transactional email API, not raw SMTP. This avoids Render's outbound SMTP
+port blocking issues entirely, since it just makes a normal HTTPS API call
+(same as calling any other REST API), which is never blocked.
 
-Setup required (one-time, by whoever owns the notification inbox):
-1. Use a Gmail account (can be a new one dedicated to this, e.g. salavaibot@gmail.com)
-2. Enable 2-Step Verification on that Google account
-3. Generate an "App Password": https://myaccount.google.com/apppasswords
-   (This is a 16-character password specifically for apps like this -- NOT your normal Gmail password)
-4. Set these as environment variables on Render (never hardcode them in code):
-   - SMTP_EMAIL      = the Gmail address sending notifications
-   - SMTP_APP_PASSWORD = the 16-character app password from step 3
-   - NOTIFY_EMAIL    = the email address that should RECEIVE lead notifications
-     (can be the same as SMTP_EMAIL, or the business owner's actual inbox)
-
-This uses Gmail's free SMTP relay -- no third-party service, no signup, no cost,
-well within Gmail's free sending limits (500 emails/day) for this use case.
+Setup required (one-time):
+1. Sign up at https://resend.com (free tier: 100 emails/day, 3,000/month)
+2. Get an API key from the Resend dashboard
+3. Verify a sending domain (or use Resend's default onboarding domain for testing)
+4. Set these environment variables on Render:
+   - RESEND_API_KEY   = your Resend API key
+   - RESEND_FROM      = the verified "from" address, e.g. "Salavai Bot <notifications@yourdomain.com>"
+   - NOTIFY_EMAIL     = comma-separated recipient email addresses
 """
 
-import smtplib
 import os
+import json
+import urllib.request
+import urllib.error
 import threading
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
 
 
 def send_lead_notification(lead_data, notify_emails=None):
     """
     Sends an email notification when a new franchise lead is captured.
-    Runs in a background thread so it can NEVER block or crash the request
-    that captures the lead -- even if SMTP hangs or times out, the lead is
-    already saved and the user already has their reply before this even runs.
+    Runs in a background thread so it never blocks or crashes the request
+    that captures the lead.
     """
     thread = threading.Thread(target=_send_email_sync, args=(lead_data, notify_emails), daemon=True)
     thread.start()
 
 
 def _send_email_sync(lead_data, notify_emails=None):
-    """
-    Sends an email notification when a new franchise lead is captured.
-    Fails silently (logs to console) if SMTP env vars aren't configured --
-    so the chatbot itself never breaks even if email isn't set up yet.
-
-    notify_emails: list of recipient email addresses. If not provided, falls
-    back to the NOTIFY_EMAIL environment variable (comma-separated).
-    """
-    smtp_email = os.environ.get("SMTP_EMAIL")
-    smtp_password = os.environ.get("SMTP_APP_PASSWORD")
+    api_key = os.environ.get("RESEND_API_KEY")
+    from_address = os.environ.get("RESEND_FROM", "onboarding@resend.dev")
 
     if notify_emails is None:
-        notify_email_raw = os.environ.get("NOTIFY_EMAIL", smtp_email or "")
+        notify_email_raw = os.environ.get("NOTIFY_EMAIL", "")
         notify_emails = [e.strip() for e in notify_email_raw.split(",") if e.strip()]
 
-    if not smtp_email or not smtp_password or not notify_emails:
-        print("[email_utils] SMTP not configured -- skipping email notification. "
-              "Set SMTP_EMAIL, SMTP_APP_PASSWORD env vars and add recipient emails to enable.")
+    if not api_key or not notify_emails:
+        print("[email_utils] Resend not configured -- skipping email notification. "
+              "Set RESEND_API_KEY env var and add recipient emails to enable.")
         return False
 
     subject = f"🧺 New Franchise Lead: {lead_data.get('name', 'Unknown')}"
-    body = f"""A new franchise/business partner lead came in via the chatbot:
+    html_body = f"""
+    <h2>New Franchise/Business Partner Lead</h2>
+    <p>A new lead came in via the chatbot:</p>
+    <ul>
+      <li><strong>Name:</strong> {lead_data.get('name', '-')}</li>
+      <li><strong>City/Area:</strong> {lead_data.get('city', '-')}</li>
+      <li><strong>Prior Experience:</strong> {lead_data.get('experience', '-')}</li>
+      <li><strong>Budget:</strong> {lead_data.get('budget', '-')}</li>
+    </ul>
+    <p>Follow up with them soon!</p>
+    """
 
-Name: {lead_data.get('name', '-')}
-City/Area: {lead_data.get('city', '-')}
-Prior Experience: {lead_data.get('experience', '-')}
-Budget: {lead_data.get('budget', '-')}
-
-Follow up with them soon!
-"""
-
-    msg = MIMEMultipart()
-    msg["From"] = smtp_email
-    msg["To"] = ", ".join(notify_emails)
-    msg["Subject"] = subject
-    msg.attach(MIMEText(body, "plain"))
+    payload = {
+        "from": from_address,
+        "to": notify_emails,
+        "subject": subject,
+        "html": html_body,
+    }
 
     try:
-        with smtplib.SMTP("smtp.gmail.com", 587, timeout=8) as server:
-            server.starttls()
-            server.login(smtp_email, smtp_password)
-            server.sendmail(smtp_email, notify_emails, msg.as_string())
-        print(f"[email_utils] Lead notification sent to {notify_emails}")
-        return True
+        req = urllib.request.Request(
+            url="https://api.resend.com/emails",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            },
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=10) as response:
+            result = response.read().decode("utf-8")
+            print(f"[email_utils] Lead notification sent via Resend to {notify_emails}: {result}")
+            return True
+    except urllib.error.HTTPError as e:
+        error_body = e.read().decode("utf-8")
+        print(f"[email_utils] Resend API error ({e.code}): {error_body}")
+        return False
     except Exception as e:
-        print(f"[email_utils] Failed to send email notification: {e}")
+        print(f"[email_utils] Failed to send email notification via Resend: {e}")
         return False
