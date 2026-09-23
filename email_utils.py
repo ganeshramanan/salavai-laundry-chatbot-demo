@@ -27,14 +27,18 @@ def send_lead_notification(lead_data):
     Sends an email notification when a new franchise lead is captured.
     Fails silently (logs to console) if SMTP env vars aren't configured --
     so the chatbot itself never breaks even if email isn't set up yet.
+
+    NOTIFY_EMAIL supports multiple recipients as a comma-separated string,
+    e.g. "owner@example.com, partner@example.com"
     """
     smtp_email = os.environ.get("SMTP_EMAIL")
     smtp_password = os.environ.get("SMTP_APP_PASSWORD")
-    notify_email = os.environ.get("NOTIFY_EMAIL", smtp_email)
+    notify_email_raw = os.environ.get("NOTIFY_EMAIL", smtp_email or "")
+    notify_emails = [e.strip() for e in notify_email_raw.split(",") if e.strip()]
 
-    if not smtp_email or not smtp_password:
+    if not smtp_email or not smtp_password or not notify_emails:
         print("[email_utils] SMTP not configured -- skipping email notification. "
-              "Set SMTP_EMAIL and SMTP_APP_PASSWORD env vars to enable.")
+              "Set SMTP_EMAIL, SMTP_APP_PASSWORD, and NOTIFY_EMAIL env vars to enable.")
         return False
 
     subject = f"🧺 New Franchise Lead: {lead_data.get('name', 'Unknown')}"
@@ -50,7 +54,7 @@ Follow up with them soon!
 
     msg = MIMEMultipart()
     msg["From"] = smtp_email
-    msg["To"] = notify_email
+    msg["To"] = ", ".join(notify_emails)
     msg["Subject"] = subject
     msg.attach(MIMEText(body, "plain"))
 
@@ -58,8 +62,8 @@ Follow up with them soon!
         with smtplib.SMTP("smtp.gmail.com", 587) as server:
             server.starttls()
             server.login(smtp_email, smtp_password)
-            server.sendmail(smtp_email, notify_email, msg.as_string())
-        print(f"[email_utils] Lead notification sent to {notify_email}")
+            server.sendmail(smtp_email, notify_emails, msg.as_string())
+        print(f"[email_utils] Lead notification sent to {notify_emails}")
         return True
     except Exception as e:
         print(f"[email_utils] Failed to send email notification: {e}")
