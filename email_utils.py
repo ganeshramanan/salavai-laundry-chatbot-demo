@@ -71,6 +71,10 @@ def _send_email_sync(lead_data, notify_emails=None):
             headers={
                 "Authorization": f"Bearer {api_key}",
                 "Content-Type": "application/json",
+                # Cloudflare (which fronts Resend's API) blocks generic scripted
+                # User-Agents like the urllib default ("Python-urllib/3.x").
+                # A normal browser-like User-Agent avoids this bot-protection block.
+                "User-Agent": "Mozilla/5.0 (compatible; GritbiChatbot/1.0)",
             },
             method="POST",
         )
