@@ -18,11 +18,23 @@ well within Gmail's free sending limits (500 emails/day) for this use case.
 
 import smtplib
 import os
+import threading
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 
 def send_lead_notification(lead_data, notify_emails=None):
+    """
+    Sends an email notification when a new franchise lead is captured.
+    Runs in a background thread so it can NEVER block or crash the request
+    that captures the lead -- even if SMTP hangs or times out, the lead is
+    already saved and the user already has their reply before this even runs.
+    """
+    thread = threading.Thread(target=_send_email_sync, args=(lead_data, notify_emails), daemon=True)
+    thread.start()
+
+
+def _send_email_sync(lead_data, notify_emails=None):
     """
     Sends an email notification when a new franchise lead is captured.
     Fails silently (logs to console) if SMTP env vars aren't configured --
@@ -61,7 +73,7 @@ Follow up with them soon!
     msg.attach(MIMEText(body, "plain"))
 
     try:
-        with smtplib.SMTP("smtp.gmail.com", 587) as server:
+        with smtplib.SMTP("smtp.gmail.com", 587, timeout=8) as server:
             server.starttls()
             server.login(smtp_email, smtp_password)
             server.sendmail(smtp_email, notify_emails, msg.as_string())
