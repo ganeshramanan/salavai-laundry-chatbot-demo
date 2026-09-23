@@ -17,6 +17,7 @@ from flask import Flask, render_template, request, jsonify, send_from_directory
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
+from email_utils import send_lead_notification
 
 app = Flask(__name__)
 
@@ -182,6 +183,7 @@ def handle_franchise_flow(message, session_state):
 
         # Save the qualified lead
         franchise_leads.append(dict(data))
+        send_lead_notification(data)
 
         reply = (f"Perfect, thank you {data.get('name', '')}! Here's a summary of what you shared:\n"
                   f"📍 City: {data.get('city')}\n"

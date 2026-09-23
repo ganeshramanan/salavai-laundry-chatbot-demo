@@ -41,10 +41,24 @@ The `KNOWLEDGE_BASE` list in `app.py` currently contains 8 sample FAQ entries ba
 - Periodically synced from their actual FAQ page
 
 ## Extending lead capture
-Currently, franchise leads are stored in memory (`franchise_leads` list) and viewable at `/api/leads` for demo purposes. In production, this should:
-- Save to a real database
-- Send an email/notification to the business owner immediately
+Currently, franchise leads are stored in memory (`franchise_leads` list) and viewable at `/api/leads` for demo purposes. **Email notification is now implemented** (see below) — in a fuller production version, this should also:
+- Save to a real database (not just in-memory)
 - Possibly integrate with a CRM or Google Sheet for easy follow-up
+
+## Setting up free email notifications
+This project sends an email automatically whenever a franchise lead completes the guided chat flow, using **Gmail's free SMTP relay** — no third-party service, no signup, no cost.
+
+### One-time setup
+1. Use a Gmail account (a dedicated one like `salavaibot@gmail.com` is recommended, but any Gmail works)
+2. Enable **2-Step Verification** on that Google account (required for App Passwords)
+3. Generate an **App Password**: go to [myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords), create one for "Mail"
+4. On Render, add these environment variables to the service:
+   - `SMTP_EMAIL` — the Gmail address sending notifications
+   - `SMTP_APP_PASSWORD` — the 16-character App Password from step 3 (NOT the normal Gmail password)
+   - `NOTIFY_EMAIL` — the email address that should receive lead notifications (can be the business owner's real inbox)
+5. Redeploy — new leads will now trigger an automatic email
+
+If these environment variables aren't set, the chatbot still works normally — it just skips sending the email (fails silently, logs a message instead of crashing).
 
 ## Business case for the owner
 - **Faster answers** for the most common question (pricing) without waiting for WhatsApp replies
