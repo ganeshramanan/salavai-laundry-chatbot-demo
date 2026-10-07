@@ -217,7 +217,9 @@ def chat():
 
     # 1. User is currently in LIVE agent mode
     if session_obj["mode"] == "live":
-        notify_visitor_reply(site_cfg["name"], session_id, message)
+        msg_id = notify_visitor_reply(site_cfg["name"], session_id, message)
+        if msg_id:
+            TELEGRAM_MSG_TO_SESSION[msg_id] = session_id
         return jsonify({
             "reply": None,  # no bot reply; user is waiting for agent
             "session_id": session_id,
