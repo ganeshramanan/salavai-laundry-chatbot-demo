@@ -71,9 +71,13 @@ def add_cors_headers(response):
 
 
 # ---------------------------------------------------------------------------
-# Knowledge Base & NLP Search
+# Knowledge Base & NLP Search (per-site, with a shared "core" layer)
 # ---------------------------------------------------------------------------
-KNOWLEDGE_BASE = [
+# CORE_KNOWLEDGE_BASE applies to every site automatically (hours, address,
+# core services, SIGP program, etc.) -- these facts are true business-wide.
+# SITE_KNOWLEDGE_BASE holds additional entries uploaded for ONE specific site
+# only (e.g. a POS billing FAQ doc, or an e-commerce delivery policy doc).
+CORE_KNOWLEDGE_BASE = [
     {"question": "What is KG Laundry and how is it priced?",
      "answer": "KG Laundry is our everyday laundry service priced by weight, not per item. "
                "It's best for daily wear, bedsheets, towels, and everyday loads -- just bag it, "
@@ -110,19 +114,32 @@ KNOWLEDGE_BASE = [
                "questions about capital, equipment, and training support."},
 ]
 
-vectorizer = None
-KB_VECTORS = None
+# Per-site extra knowledge, uploaded via /admin. Starts empty for every site.
+SITE_KNOWLEDGE_BASE = {site_id: [] for site_id in SITES}
+
+# Per-site search index -- rebuilt whenever that site's KB changes.
+_vectorizers = {}
+_kb_vectors = {}
+_kb_entries = {}  # site_id -> combined list of entries actually indexed (core + site-specific)
 
 
-def rebuild_search_index():
-    global vectorizer, KB_VECTORS
+def rebuild_search_index(site_id):
+    """Rebuilds the TF-IDF search index for one site from CORE + its own uploads."""
+    entries = CORE_KNOWLEDGE_BASE + SITE_KNOWLEDGE_BASE.get(site_id, [])
+    _kb_entries[site_id] = entries
     vectorizer = TfidfVectorizer(stop_words="english")
-    KB_VECTORS = vectorizer.fit_transform(
-        [item["question"] + " " + item["answer"] for item in KNOWLEDGE_BASE]
+    _vectorizers[site_id] = vectorizer
+    _kb_vectors[site_id] = vectorizer.fit_transform(
+        [item["question"] + " " + item["answer"] for item in entries]
     )
 
 
-rebuild_search_index()
+def rebuild_all_search_indexes():
+    for site_id in SITES:
+        rebuild_search_index(site_id)
+
+
+rebuild_all_search_indexes()
 
 # ---------------------------------------------------------------------------
 # Live Sessions & State Management
@@ -142,14 +159,21 @@ franchise_leads = []
 notify_emails = [e.strip() for e in os.environ.get("NOTIFY_EMAIL", "").split(",") if e.strip()]
 
 
-def get_faq_answer(user_question, threshold=0.15):
+def get_faq_answer(user_question, site_id, threshold=0.15):
+    site_id = site_id if site_id in SITES else "salavai"
+    vectorizer = _vectorizers.get(site_id)
+    kb_vectors = _kb_vectors.get(site_id)
+    entries = _kb_entries.get(site_id, [])
+    if not vectorizer or not entries:
+        return None, 0.0
+
     question_vector = vectorizer.transform([user_question])
-    similarities = cosine_similarity(question_vector, KB_VECTORS)[0]
+    similarities = cosine_similarity(question_vector, kb_vectors)[0]
     best_idx = int(np.argmax(similarities))
     best_score = float(similarities[best_idx])
     if best_score < threshold:
         return None, best_score
-    return KNOWLEDGE_BASE[best_idx]["answer"], best_score
+    return entries[best_idx]["answer"], best_score
 
 
 # ---------------------------------------------------------------------------
@@ -259,7 +283,7 @@ def chat():
         })
 
     # 4. Standard FAQ answer
-    answer, score = get_faq_answer(message)
+    answer, score = get_faq_answer(message, site_id)
     if answer:
         reply = answer
     else:
@@ -296,7 +320,10 @@ def handle_franchise_flow(message, session_obj, session_id):
         data["budget"] = message
         session_state["step"] = "done"
 
-        franchise_leads.append(dict(data))
+        lead_record = dict(data)
+        lead_record["site_id"] = session_obj.get("site_id", "salavai")
+        lead_record["site_name"] = SITES.get(lead_record["site_id"], {}).get("name", lead_record["site_id"])
+        franchise_leads.append(lead_record)
         send_lead_notification(data, notify_emails)
 
         reply = (f"Perfect, thank you {data.get('name', '')}! Here's a summary of what you shared:\n"
@@ -476,9 +503,15 @@ def admin_logout():
 @app.route("/admin")
 @require_admin_login
 def admin_dashboard():
+    kb_counts = {
+        site_id: len(CORE_KNOWLEDGE_BASE) + len(SITE_KNOWLEDGE_BASE.get(site_id, []))
+        for site_id in SITES
+    }
     return render_template(
         "admin_dashboard.html",
-        kb_count=len(KNOWLEDGE_BASE),
+        sites=SITES,
+        kb_counts=kb_counts,
+        core_count=len(CORE_KNOWLEDGE_BASE),
         emails=notify_emails,
         leads=franchise_leads,
     )
@@ -488,6 +521,10 @@ def admin_dashboard():
 @require_admin_login
 def admin_upload():
     file = request.files.get("document")
+    site_id = request.form.get("site_id", "salavai")
+    if site_id not in SITES:
+        site_id = "salavai"
+
     if not file or file.filename == "":
         return redirect(url_for("admin_dashboard"))
 
@@ -496,9 +533,8 @@ def admin_upload():
     try:
         text = extract_text_from_file(file_bytes, filename)
         new_entries = chunk_text_into_qa_pairs(text)
-        global KNOWLEDGE_BASE
-        KNOWLEDGE_BASE.extend(new_entries)
-        rebuild_search_index()
+        SITE_KNOWLEDGE_BASE[site_id].extend(new_entries)
+        rebuild_search_index(site_id)
     except Exception as e:
         print(f"[admin_upload] Failed to process document: {e}")
 

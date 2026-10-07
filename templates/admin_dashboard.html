@@ -31,6 +31,16 @@
   }
   button:hover { opacity: 0.9; }
 
+  select {
+    width: 100%; padding: 10px 14px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px;
+    margin-bottom: 12px; background: #fff;
+  }
+  .kb-breakdown { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+  .kb-pill {
+    background: #f1f5f9; border-radius: 20px; padding: 6px 14px; font-size: 12px; color: #374151;
+  }
+  .kb-pill b { color: var(--primary); }
+
   table { width: 100%; border-collapse: collapse; font-size: 13px; }
   th, td { text-align: left; padding: 8px; border-bottom: 1px solid #eee; }
   th { color: #6b7280; font-size: 11px; text-transform: uppercase; }
@@ -47,8 +57,19 @@
 
   <div class="card">
     <h2>📚 Knowledge Base</h2>
-    <div class="sub">The bot currently knows <span class="stat">{{ kb_count }}</span> pieces of content.</div>
+    <div class="sub">Core FAQs ({{ core_count }} entries) are shared across every site automatically. Site-specific uploads only train that one site's bot.</div>
+    <div class="kb-breakdown">
+      {% for site_id, cfg in sites.items() %}
+      <div class="kb-pill">{{ cfg.name }}: <b>{{ kb_counts[site_id] }}</b> entries</div>
+      {% endfor %}
+    </div>
     <form action="/admin/upload" method="POST" enctype="multipart/form-data">
+      <label style="font-size:13px; font-weight:600;">Upload knowledge for:</label>
+      <select name="site_id">
+        {% for site_id, cfg in sites.items() %}
+        <option value="{{ site_id }}">{{ cfg.name }}</option>
+        {% endfor %}
+      </select>
       <label style="font-size:13px; font-weight:600;">Upload a Word (.docx) or PDF document to add more knowledge:</label><br><br>
       <input type="file" name="document" accept=".docx,.pdf" required>
       <button type="submit">Upload & Train Bot</button>
@@ -69,10 +90,11 @@
     <div class="sub">Total leads: <strong>{{ leads|length }}</strong></div>
     {% if leads|length > 0 %}
     <table>
-      <thead><tr><th>Name</th><th>City</th><th>Experience</th><th>Budget</th></tr></thead>
+      <thead><tr><th>Site</th><th>Name</th><th>City</th><th>Experience</th><th>Budget</th></tr></thead>
       <tbody>
         {% for lead in leads %}
         <tr>
+          <td>{{ lead.site_name or lead.site_id or '—' }}</td>
           <td>{{ lead.name }}</td>
           <td>{{ lead.city }}</td>
           <td>{{ lead.experience }}</td>
