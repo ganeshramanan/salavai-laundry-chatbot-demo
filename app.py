@@ -356,12 +356,25 @@ def telegram_webhook():
         target_session_id = match.group(1).lower()
         text = match.group(2)
 
-    # Option C: Default to the most recent active live session
+    # Option C: Only auto-fallback if there is EXACTLY ONE active live session.
+    # If there are 0 or 2+, guessing risks sending a reply to the wrong customer/site
+    # (this caused Main Website replies to land in the POS chat) -- so we refuse to guess.
     if not target_session_id:
-        for sid, sess in reversed(list(SESSIONS.items())):
-            if sess.get("mode") == "live":
-                target_session_id = sid
-                break
+        active_live = [(sid, sess) for sid, sess in SESSIONS.items() if sess.get("mode") == "live"]
+        if len(active_live) == 1:
+            target_session_id = active_live[0][0]
+        elif len(active_live) > 1:
+            listing = "\n".join(
+                f"• <code>{sid}</code> — {SITES.get(sess.get('site_id'), {}).get('name', sess.get('site_id'))}"
+                for sid, sess in active_live
+            )
+            send_telegram_message(
+                "⚠️ Multiple live chats are active right now. I can't guess which one you meant.\n\n"
+                "Please <b>swipe-reply</b> to the original alert, or prefix your message with the session id, e.g.:\n"
+                "<code>#8ec1815f Hello!</code>\n\n"
+                f"Active sessions:\n{listing}"
+            )
+            return jsonify({"ok": True})
 
     if target_session_id and target_session_id in SESSIONS:
         session_obj = SESSIONS[target_session_id]
@@ -375,7 +388,8 @@ def telegram_webhook():
             "sender": "agent",
             "time": time.time()
         })
-        send_telegram_message(f"✅ Delivered to session <code>{target_session_id}</code>: \"{text}\"")
+        site_name = SITES.get(session_obj.get("site_id"), {}).get("name", session_obj.get("site_id"))
+        send_telegram_message(f"✅ Delivered to <b>{site_name}</b> (session <code>{target_session_id}</code>): \"{text}\"")
     else:
         send_telegram_message("⚠️ Could not match this reply to an active customer session. Use reply-to or start message with <code>#session_id message</code>.")
 
