@@ -2,7 +2,7 @@
  * Multi-Tenant Live Chat & Bot Widget
  * 
  * Embed usage on any website (Salavai Laundry, or any of Hari's 4 sites):
- * <script src="https://salavai-laundry-chatbot-demo.onrender.com/widget.js" data-site="salavai"></script>
+ * <script src="https://salavai-laundry-chatbot-demo-1.onrender.com/widget.js" data-site="salavai"></script>
  */
 (function () {
   // 1. Detect configuration from current script tag
@@ -15,7 +15,7 @@
 
   const API_BASE = window.location.origin.includes("localhost")
     ? "http://localhost:5008"
-    : "https://salavai-laundry-chatbot-demo.onrender.com";
+    : "https://salavai-laundry-chatbot-demo-1.onrender.com";
 
   let sessionId = localStorage.getItem("slw_session_" + SITE_ID) || null;
   let pollInterval = null;

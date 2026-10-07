@@ -110,79 +110,8 @@
   Click the chat bubble in the bottom-right to try it
 </div>
 
-<!-- Floating chat widget -->
-<div class="chat-bubble" id="chatBubble">💬</div>
-
-<div class="chat-window" id="chatWindow">
-  <div class="chat-header">
-    <div>
-      Salavai Laundry Assistant
-      <div class="sub">Ask about pricing, pickup, or franchise opportunities</div>
-    </div>
-    <div class="close-btn" id="closeBtn">✕</div>
-  </div>
-  <div class="chat-messages" id="chatMessages">
-    <div class="msg bot">👋 Hi! I can help with pricing, pickup, turnaround time, or becoming a business partner. What would you like to know?</div>
-  </div>
-  <div class="quick-replies">
-    <div class="quick-reply" onclick="sendQuickReply('What is KG Laundry pricing?')">KG Laundry pricing</div>
-    <div class="quick-reply" onclick="sendQuickReply('How does pickup work?')">Pickup process</div>
-    <div class="quick-reply" onclick="sendQuickReply('I want to become a franchise partner')">Become a partner</div>
-  </div>
-  <div class="chat-input-row">
-    <input type="text" id="chatInput" placeholder="Type your question..." onkeypress="handleEnter(event)">
-    <button onclick="sendMessage()">➤</button>
-  </div>
-</div>
-
-<script>
-  let sessionState = {};
-
-  const chatBubble = document.getElementById("chatBubble");
-  const chatWindow = document.getElementById("chatWindow");
-  const closeBtn = document.getElementById("closeBtn");
-
-  chatBubble.addEventListener("click", () => chatWindow.classList.add("open"));
-  closeBtn.addEventListener("click", () => chatWindow.classList.remove("open"));
-
-  function appendMessage(text, sender) {
-    const container = document.getElementById("chatMessages");
-    const div = document.createElement("div");
-    div.className = "msg " + sender;
-    div.textContent = text;
-    container.appendChild(div);
-    container.scrollTop = container.scrollHeight;
-  }
-
-  function sendQuickReply(text) {
-    document.getElementById("chatInput").value = text;
-    sendMessage();
-  }
-
-  function handleEnter(e) {
-    if (e.key === "Enter") sendMessage();
-  }
-
-  function sendMessage() {
-    const input = document.getElementById("chatInput");
-    const message = input.value.trim();
-    if (!message) return;
-
-    appendMessage(message, "user");
-    input.value = "";
-
-    fetch("/api/chat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message, state: sessionState })
-    })
-      .then(res => res.json())
-      .then(data => {
-        appendMessage(data.reply, "bot");
-        sessionState = data.state || {};
-      });
-  }
-</script>
+<!-- Embeddable live chat widget (multi-tenant, Telegram agent handoff) -->
+<script src="/widget.js" data-site="salavai"></script>
 
 </body>
 </html>
