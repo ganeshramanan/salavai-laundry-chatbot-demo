@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ cfg.name }} — Live Demo</title>
+<style>
+  :root {
+    --primary: {{ cfg.primary_color }}; --dark: {{ cfg.dark_color }}; --bg: #f7f8fa; --text: #1a1a1a; --text-dim: #6b7280;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); }
+
+  .mock-header {
+    background: #fff; padding: 20px 40px; display: flex; justify-content: space-between;
+    align-items: center; border-bottom: 1px solid #e5e7eb;
+  }
+  .mock-logo { font-weight: 800; color: var(--dark); font-size: 18px; }
+  .mock-logo span { color: var(--primary); }
+  .mock-nav { display: flex; gap: 24px; font-size: 14px; color: var(--text-dim); }
+
+  .demo-banner {
+    background: var(--dark); color: #fff; text-align: center; padding: 12px; font-size: 13px;
+  }
+  .demo-banner strong { color: #ffd166; }
+  .demo-banner code {
+    background: rgba(255,255,255,0.15); padding: 2px 8px; border-radius: 6px; font-size: 12px;
+  }
+
+  .mock-hero {
+    max-width: 900px; margin: 60px auto; text-align: center; padding: 0 24px;
+  }
+  .mock-hero h1 { font-size: 32px; color: var(--dark); margin-bottom: 12px; }
+  .mock-hero p { color: var(--text-dim); font-size: 16px; }
+
+  .try-hint {
+    text-align: center; margin-top: 40px; font-size: 14px; color: var(--text-dim);
+  }
+  .try-hint .arrow { font-size: 24px; }
+
+  .site-switcher {
+    text-align: center; margin-top: 24px; font-size: 13px;
+  }
+  .site-switcher a {
+    display: inline-block; margin: 4px 6px; padding: 6px 14px; border-radius: 20px;
+    border: 1px solid #e5e7eb; color: var(--text-dim); text-decoration: none; background: #fff;
+  }
+  .site-switcher a.active { background: var(--primary); color: #fff; border-color: var(--primary); font-weight: 700; }
+</style>
+</head>
+<body>
+
+<div class="demo-banner">
+  🧪 <strong>Live Demo — {{ cfg.name }}</strong> &nbsp;|&nbsp; site_id: <code>{{ site_id }}</code>
+</div>
+
+<div class="mock-header">
+  <div class="mock-logo">The <span>Salavai</span> Laundry</div>
+  <div class="mock-nav">
+    <span>Our Stores</span><span>Home</span><span>About Us</span><span>Business Partner Program</span>
+  </div>
+</div>
+
+<div class="mock-hero">
+  <h1>{{ cfg.name }}</h1>
+  <p>This mock page simulates {{ cfg.name }} — one of Hari's 4 Salavai properties. Same bot backend, different branding &amp; FAQ context per site.</p>
+</div>
+
+<div class="try-hint">
+  <div class="arrow">↘️</div>
+  Click the chat bubble in the bottom-right to try it
+</div>
+
+<div class="site-switcher">
+  <a href="/" class="{{ 'active' if site_id == 'salavai' else '' }}">🏠 Main Website</a>
+  <a href="/demo/pos" class="{{ 'active' if site_id == 'pos' else '' }}">🧾 POS / Billing Counter</a>
+  <a href="/demo/ecommerce" class="{{ 'active' if site_id == 'ecommerce' else '' }}">🛒 Online Store</a>
+  <a href="/demo/franchise" class="{{ 'active' if site_id == 'franchise' else '' }}">🤝 Franchise Portal</a>
+</div>
+
+<!-- Embeddable live chat widget (multi-tenant, Telegram agent handoff) -->
+<script src="/widget.js" data-site="{{ site_id }}"></script>
+
+</body>
+</html>

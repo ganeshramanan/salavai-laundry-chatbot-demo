@@ -27,7 +27,7 @@ TELEGRAM_AGENT_CHAT_ID = os.environ.get("TELEGRAM_AGENT_CHAT_ID", "7202298356")
 # ---------------------------------------------------------------------------
 SITES = {
     "salavai": {
-        "name": "The Salavai Laundry",
+        "name": "The Salavai Laundry — Main Website",
         "primary_color": "#a41e22",
         "dark_color": "#14324f",
         "greeting": "👋 Welcome to The Salavai Laundry! How can we assist you with your laundry or dry cleaning today?",
@@ -38,26 +38,26 @@ SITES = {
             "💬 Talk to Human"
         ]
     },
-    "site2": {
-        "name": "Partner Business 2",
+    "pos": {
+        "name": "Salavai POS / Billing Counter",
         "primary_color": "#2563eb",
         "dark_color": "#0f172a",
-        "greeting": "👋 Hello! How can we help you today?",
-        "quick_replies": ["Services & Pricing", "Contact Support", "💬 Talk to Human"]
+        "greeting": "👋 Hi! Need help with billing, invoices, or a customer order lookup at the counter?",
+        "quick_replies": ["Order status lookup", "Billing / invoice issue", "💬 Talk to Human"]
     },
-    "site3": {
-        "name": "Partner Business 3",
+    "ecommerce": {
+        "name": "Salavai Online Store (E-commerce)",
         "primary_color": "#059669",
         "dark_color": "#064e3b",
-        "greeting": "👋 Hello! Welcome! How can we help?",
-        "quick_replies": ["Inquiry", "💬 Talk to Human"]
+        "greeting": "👋 Welcome to our online store! Ask about orders, delivery, or returns.",
+        "quick_replies": ["Track my order", "Delivery & returns policy", "💬 Talk to Human"]
     },
-    "site4": {
-        "name": "Partner Business 4",
+    "franchise": {
+        "name": "Salavai Franchise / Partner Portal",
         "primary_color": "#7c3aed",
         "dark_color": "#3b0764",
-        "greeting": "👋 Welcome! Ask any question or request live support.",
-        "quick_replies": ["Pricing", "💬 Talk to Human"]
+        "greeting": "👋 Welcome! Interested in starting your own Salavai franchise?",
+        "quick_replies": ["Franchise investment details", "I want to become a partner", "💬 Talk to Human"]
     }
 }
 
@@ -171,6 +171,16 @@ def widget_js():
 @app.route("/embed-test")
 def embed_test():
     return render_template("embed_test.html")
+
+
+@app.route("/demo/<site_id>")
+def demo_site(site_id):
+    """Generic mock website preview for any tenant — used to demo the widget
+    live on 4 separate 'websites' (POS, E-commerce, Franchise, Main site)."""
+    cfg = SITES.get(site_id)
+    if not cfg:
+        return "Unknown site_id. Try one of: " + ", ".join(SITES.keys()), 404
+    return render_template("mock_site.html", site_id=site_id, cfg=cfg)
 
 
 @app.route("/api/site-config")
