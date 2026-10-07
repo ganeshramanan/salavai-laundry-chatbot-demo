@@ -3,33 +3,75 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Embed Test — A Totally Unrelated Website</title>
+<title>Embed Test — Multi-Tenant & Live Chat Verification</title>
 <style>
-  body { font-family: Georgia, serif; background: #fffdf7; color: #3a3a3a; padding: 60px; max-width: 700px; margin: 0 auto; }
-  h1 { color: #2c5f2d; }
-  .note {
-    background: #eaf5ea; border: 1px solid #97c9a0; border-radius: 8px; padding: 16px; margin: 24px 0;
-    font-family: -apple-system, sans-serif; font-size: 14px;
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f8fafc; color: #1e293b; padding: 40px 20px; max-width: 800px; margin: 0 auto; line-height: 1.6; }
+  h1 { color: #0f172a; font-size: 26px; }
+  .card {
+    background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin: 20px 0;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
   }
+  .badge { background: #dbeafe; color: #1e40af; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; }
   code {
-    background: #f0f0f0; padding: 3px 8px; border-radius: 4px; font-size: 13px; display: block; margin-top: 8px;
+    background: #f1f5f9; padding: 3px 8px; border-radius: 6px; font-size: 13px; font-family: monospace; display: inline-block;
   }
+  .selector { margin-top: 15px; }
+  select { padding: 8px 12px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 14px; }
 </style>
 </head>
 <body>
-  <h1>🌼 A Completely Different Website</h1>
-  <p>This page has nothing to do with laundry — it's deliberately styled differently (serif font, green/cream colors)
-  to prove the chatbot widget below works on ANY website, regardless of its existing design.</p>
+  <h1>🚀 Multi-Site Chat & Live Agent Test Page</h1>
+  <p>This test page simulates embedding the widget on any client website. The widget automatically adapts branding based on <code>data-site</code>.</p>
 
-  <div class="note">
-    ✅ <strong>This page loads the chatbot using a single script tag</strong> — no other code changes.
-    <code>&lt;script src="/widget.js"&gt;&lt;/script&gt;</code>
+  <div class="card">
+    <span class="badge">Multi-Tenant Test</span>
+    <p style="margin-top: 10px;">Select which of Hari's websites you are previewing:</p>
+    <div class="selector">
+      <select id="site-picker" onchange="switchSite(this.value)">
+        <option value="salavai" selected>Site 1: The Salavai Laundry (Red Theme)</option>
+        <option value="site2">Site 2: Business 2 (Blue Theme)</option>
+        <option value="site3">Site 3: Business 3 (Green Theme)</option>
+        <option value="site4">Site 4: Business 4 (Purple Theme)</option>
+      </select>
+    </div>
   </div>
 
-  <p>Scroll down, or just look at the bottom-right corner of your screen — the chat bubble should appear there,
-  fully functional, styled independently of this page's fonts/colors.</p>
+  <div class="card">
+    <h3>How to test Live Handoff:</h3>
+    <ol>
+      <li>Click the chat bubble in the bottom right.</li>
+      <li>Click <strong>"💬 Talk to Human"</strong> or type <em>"I want to speak with support"</em>.</li>
+      <li>Check your phone's <strong>Telegram app</strong> — you will receive an instant notification!</li>
+      <li>Swipe reply to the notification in Telegram.</li>
+      <li>Watch your live reply appear inside the chat bubble right here on the website!</li>
+    </ol>
+  </div>
 
-  <!-- THIS IS THE ONLY LINE NEEDED TO EMBED THE CHATBOT -->
-  <script src="/widget.js"></script>
+  <!-- Dynamic script injection for preview switcher -->
+  <script>
+    function loadWidget(siteId) {
+      const oldScript = document.getElementById("widget-script");
+      if (oldScript) oldScript.remove();
+      const oldBubble = document.getElementById("slw-bubble");
+      if (oldBubble) oldBubble.remove();
+      const oldWindow = document.getElementById("slw-window");
+      if (oldWindow) oldWindow.remove();
+      const oldStyles = document.getElementById("slw-custom-styles");
+      if (oldStyles) oldStyles.remove();
+
+      const script = document.createElement("script");
+      script.id = "widget-script";
+      script.src = "/widget.js";
+      script.setAttribute("data-site", siteId);
+      document.body.appendChild(script);
+    }
+
+    function switchSite(siteId) {
+      loadWidget(siteId);
+    }
+
+    // Initial load
+    loadWidget("salavai");
+  </script>
 </body>
 </html>
