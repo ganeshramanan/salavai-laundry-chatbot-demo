@@ -187,6 +187,14 @@
       badge.textContent = "Live Agent";
       badge.style.background = "#2563eb";
       startPolling();
+    } else {
+      banner.style.display = "none";
+      badge.textContent = "Online";
+      badge.style.background = "#059669";
+      if (pollInterval) {
+        clearInterval(pollInterval);
+        pollInterval = null;
+      }
     }
   }
 
@@ -202,8 +210,12 @@
       .then(data => {
         if (data.new_messages && data.new_messages.length > 0) {
           data.new_messages.forEach(msg => {
-            appendMessage(msg.text, "agent");
+            appendMessage(msg.text, msg.sender || "agent");
           });
+        }
+        // Agent closed the chat (/close in Telegram) -> hand back to bot
+        if (data.mode === "bot" && isLiveMode) {
+          setLiveModeUI(false);
         }
       })
       .catch(() => {});

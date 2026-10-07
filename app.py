@@ -345,6 +345,50 @@ def telegram_webhook():
     if not text:
         return jsonify({"ok": True})
 
+    # ---------------------------------------------------------------------
+    # /close command: ends live-agent mode and hands the session back to the
+    # bot, so it resumes answering FAQs automatically. Usage:
+    #   /close #a1b2c3d4     -> close that specific session
+    #   /close                (as a reply to an alert) -> closes that session
+    # ---------------------------------------------------------------------
+    close_match = re.match(r"^/close\b\s*#?([a-f0-9]{8})?\s*$", text, re.IGNORECASE)
+    if close_match:
+        close_session_id = close_match.group(1).lower() if close_match.group(1) else None
+
+        if not close_session_id and reply_to:
+            close_session_id = TELEGRAM_MSG_TO_SESSION.get(reply_to.get("message_id"))
+
+        if not close_session_id:
+            active_live = [(sid, sess) for sid, sess in SESSIONS.items() if sess.get("mode") == "live"]
+            if len(active_live) == 1:
+                close_session_id = active_live[0][0]
+            elif len(active_live) > 1:
+                listing = "\n".join(
+                    f"• <code>{sid}</code> — {SITES.get(sess.get('site_id'), {}).get('name', sess.get('site_id'))}"
+                    for sid, sess in active_live
+                )
+                send_telegram_message(
+                    "⚠️ Multiple live chats are active. Specify which to close, e.g.:\n"
+                    "<code>/close #a1b2c3d4</code>\n\n"
+                    f"Active sessions:\n{listing}"
+                )
+                return jsonify({"ok": True})
+
+        if close_session_id and close_session_id in SESSIONS:
+            session_obj = SESSIONS[close_session_id]
+            session_obj["mode"] = "bot"
+            site_name = SITES.get(session_obj.get("site_id"), {}).get("name", session_obj.get("site_id"))
+            session_obj["pending_agent_replies"].append({
+                "text": "Thanks for chatting with our support team! I'm back to help with any other questions. 😊",
+                "sender": "bot",
+                "time": time.time()
+            })
+            send_telegram_message(f"🔒 Closed live chat for <b>{site_name}</b> (session <code>{close_session_id}</code>). Bot has resumed answering FAQs.")
+        else:
+            send_telegram_message("⚠️ Could not find that session to close. Use <code>/close #session_id</code>.")
+
+        return jsonify({"ok": True})
+
     target_session_id = None
 
     # Option A: Check if this was a direct reply to a notification
