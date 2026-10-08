@@ -96,6 +96,19 @@ class NotifyEmail(Base):
     email = Column(String(300), primary_key=True)
 
 
+class Site(Base):
+    """A tenant/website config -- replaces the old hardcoded SITES dict so new
+    websites can be added via /admin without a code change + redeploy."""
+    __tablename__ = "sites"
+    site_id = Column(String(50), primary_key=True)
+    name = Column(String(200), nullable=False)
+    primary_color = Column(String(20), default="#a41e22")
+    dark_color = Column(String(20), default="#14324f")
+    greeting = Column(Text, default="👋 Hello! How can we assist you today?")
+    quick_replies = Column(JSON, default=list)  # list[str]
+    created_at = Column(Float, default=time.time)
+
+
 def init_db():
     """Create all tables if they don't exist yet. Safe to call on every startup."""
     if not engine:

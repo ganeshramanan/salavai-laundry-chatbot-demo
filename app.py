@@ -23,7 +23,7 @@ from email_utils import send_lead_notification
 from document_utils import extract_text_from_file, chunk_text_into_qa_pairs
 from telegram_utils import notify_live_request, notify_visitor_reply, send_telegram_message
 import db as dbm
-from db import ChatSession, ChatMessage, TelegramMsgMap, FranchiseLead, LiveChatLead, KnowledgeEntry, NotifyEmail
+from db import ChatSession, ChatMessage, TelegramMsgMap, FranchiseLead, LiveChatLead, KnowledgeEntry, NotifyEmail, Site
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "salavai-multi-site-secret-2026")
@@ -32,10 +32,12 @@ ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "salavai123")
 TELEGRAM_AGENT_CHAT_ID = os.environ.get("TELEGRAM_AGENT_CHAT_ID", "7202298356")
 
 # ---------------------------------------------------------------------------
-# Multi-Site Configurations (Tenants) -- stays in code, not DB. These are
-# deployment-time config (branding/copy), not runtime data.
+# Default/seed site configs. These are ONLY used to populate the `sites`
+# table the first time the app runs against an empty database. After that,
+# the DB is the source of truth -- new tenants/websites can be added via
+# /admin/sites without any code change or redeploy.
 # ---------------------------------------------------------------------------
-SITES = {
+DEFAULT_SITES = {
     "salavai": {
         "name": "The Salavai Laundry — Main Website",
         "primary_color": "#a41e22",
@@ -45,7 +47,7 @@ SITES = {
             "What is KG Laundry pricing?",
             "How does pickup work?",
             "I want to become a partner",
-            "💬 Talk to Human"
+            "💬 Chat with Human"
         ]
     },
     "pos": {
@@ -53,21 +55,21 @@ SITES = {
         "primary_color": "#2563eb",
         "dark_color": "#0f172a",
         "greeting": "👋 Hi! Need help with billing, invoices, or a customer order lookup at the counter?",
-        "quick_replies": ["Order status lookup", "Billing / invoice issue", "💬 Talk to Human"]
+        "quick_replies": ["Order status lookup", "Billing / invoice issue", "💬 Chat with Human"]
     },
     "ecommerce": {
         "name": "Salavai Online Store (E-commerce)",
         "primary_color": "#059669",
         "dark_color": "#064e3b",
         "greeting": "👋 Welcome to our online store! Ask about orders, delivery, or returns.",
-        "quick_replies": ["Track my order", "Delivery & returns policy", "💬 Talk to Human"]
+        "quick_replies": ["Track my order", "Delivery & returns policy", "💬 Chat with Human"]
     },
     "franchise": {
         "name": "Salavai Franchise / Partner Portal",
         "primary_color": "#7c3aed",
         "dark_color": "#3b0764",
         "greeting": "👋 Welcome! Interested in starting your own Salavai franchise?",
-        "quick_replies": ["Franchise investment details", "I want to become a partner", "💬 Talk to Human"]
+        "quick_replies": ["Franchise investment details", "I want to become a partner", "💬 Chat with Human"]
     }
 }
 
@@ -118,6 +120,49 @@ def add_cors_headers(response):
 
 
 # ---------------------------------------------------------------------------
+# Sites (Tenants) -- DB-backed, with an in-memory cache. New websites can be
+# added via /admin/sites without any code change or redeploy.
+# ---------------------------------------------------------------------------
+_sites_cache = {}
+
+
+def ensure_default_sites_seeded():
+    """One-time: insert DEFAULT_SITES into the DB if the sites table is empty."""
+    with dbm.get_db() as s:
+        existing = s.query(Site).count()
+        if existing == 0:
+            for site_id, cfg in DEFAULT_SITES.items():
+                s.add(Site(
+                    site_id=site_id, name=cfg["name"], primary_color=cfg["primary_color"],
+                    dark_color=cfg["dark_color"], greeting=cfg["greeting"],
+                    quick_replies=cfg["quick_replies"]
+                ))
+            s.commit()
+
+
+def reload_sites_cache():
+    global _sites_cache
+    with dbm.get_db() as s:
+        rows = s.query(Site).all()
+        _sites_cache = {
+            r.site_id: {
+                "name": r.name, "primary_color": r.primary_color, "dark_color": r.dark_color,
+                "greeting": r.greeting, "quick_replies": r.quick_replies or []
+            }
+            for r in rows
+        }
+
+
+def get_sites():
+    """Returns the current site config dict, e.g. {'salavai': {...}, 'pos': {...}}."""
+    return _sites_cache
+
+
+def get_site(site_id, default_id="salavai"):
+    return _sites_cache.get(site_id) or _sites_cache.get(default_id) or {}
+
+
+# ---------------------------------------------------------------------------
 # Knowledge Base & NLP Search (per-site, with a shared "core" layer)
 # ---------------------------------------------------------------------------
 # Core entries live in CORE_KNOWLEDGE_BASE (code, not DB -- they're part of
@@ -155,12 +200,13 @@ def rebuild_search_index(site_id):
 
 
 def rebuild_all_search_indexes():
-    for site_id in SITES:
+    for site_id in get_sites():
         rebuild_search_index(site_id)
 
 
 def get_faq_answer(user_question, site_id, threshold=0.15):
-    site_id = site_id if site_id in SITES else "salavai"
+    if site_id not in get_sites():
+        site_id = "salavai"
     vectorizer = _vectorizers.get(site_id)
     kb_vectors = _kb_vectors.get(site_id)
     entries = _kb_entries.get(site_id, [])
@@ -177,9 +223,11 @@ def get_faq_answer(user_question, site_id, threshold=0.15):
 
 
 # ---------------------------------------------------------------------------
-# App startup: initialize DB, seed core KB, build search indexes
+# App startup: initialize DB, seed sites + core KB, build search indexes
 # ---------------------------------------------------------------------------
 dbm.init_db()
+ensure_default_sites_seeded()
+reload_sites_cache()
 ensure_core_kb_seeded()
 rebuild_all_search_indexes()
 
@@ -213,17 +261,18 @@ def embed_test():
 @app.route("/demo/<site_id>")
 def demo_site(site_id):
     """Generic mock website preview for any tenant — used to demo the widget
-    live on 4 separate 'websites' (POS, E-commerce, Franchise, Main site)."""
-    cfg = SITES.get(site_id)
+    live on any registered site (POS, E-commerce, Franchise, Main site, or
+    any new tenant added via /admin/sites)."""
+    cfg = get_sites().get(site_id)
     if not cfg:
-        return "Unknown site_id. Try one of: " + ", ".join(SITES.keys()), 404
+        return "Unknown site_id. Try one of: " + ", ".join(get_sites().keys()), 404
     return render_template("mock_site.html", site_id=site_id, cfg=cfg)
 
 
 @app.route("/api/site-config")
 def site_config():
     site_id = request.args.get("site_id", "salavai")
-    cfg = SITES.get(site_id, SITES["salavai"])
+    cfg = get_site(site_id)
     return jsonify(cfg)
 
 
@@ -233,7 +282,7 @@ def chat():
     message = (data.get("message") or "").strip()
     session_id = data.get("session_id")
     site_id = data.get("site_id", "salavai")
-    site_cfg = SITES.get(site_id, SITES["salavai"])
+    site_cfg = get_site(site_id)
 
     with dbm.get_db() as s:
         sess = s.get(ChatSession, session_id) if session_id else None
@@ -341,7 +390,7 @@ def handle_franchise_flow(message, sess, session_id, s):
         session_state["step"] = "done"
 
         site_id = sess.site_id or "salavai"
-        site_name = SITES.get(site_id, {}).get("name", site_id)
+        site_name = get_site(site_id).get("name", site_id)
         s.add(FranchiseLead(
             site_id=site_id, site_name=site_name,
             name=data.get("name"), city=data.get("city"),
@@ -415,7 +464,7 @@ def telegram_webhook():
             return s.query(ChatSession).filter(ChatSession.mode == "live").all()
 
         def site_name_for(sess):
-            return SITES.get(sess.site_id, {}).get("name", sess.site_id)
+            return get_site(sess.site_id).get("name", sess.site_id)
 
         # -------------------------------------------------------------
         # /claim command
@@ -586,7 +635,7 @@ def admin_dashboard():
     with dbm.get_db() as s:
         core_count = s.query(KnowledgeEntry).filter(KnowledgeEntry.site_id.is_(None)).count()
         kb_counts = {}
-        for site_id in SITES:
+        for site_id in get_sites():
             site_count = s.query(KnowledgeEntry).filter(KnowledgeEntry.site_id == site_id).count()
             kb_counts[site_id] = core_count + site_count
 
@@ -650,7 +699,7 @@ def admin_dashboard():
 
         return render_template(
             "admin_dashboard.html",
-            sites=SITES,
+            sites=get_sites(),
             kb_counts=kb_counts,
             core_count=core_count,
             emails=emails,
@@ -661,6 +710,8 @@ def admin_dashboard():
             range_key=range_key,
             start_date=start_date,
             end_date=end_date,
+            new_site=request.args.get("new_site"),
+            base_url=request.url_root.rstrip("/"),
         )
 
 
@@ -669,7 +720,7 @@ def admin_dashboard():
 def admin_upload():
     file = request.files.get("document")
     site_id = request.form.get("site_id", "salavai")
-    if site_id not in SITES:
+    if site_id not in get_sites():
         site_id = "salavai"
 
     if not file or file.filename == "":
@@ -706,6 +757,44 @@ def admin_update_emails():
             s.add(NotifyEmail(email=email))
         s.commit()
     return redirect(url_for("admin_dashboard"))
+
+
+@app.route("/admin/sites/add", methods=["POST"])
+@require_admin_login
+def admin_add_site():
+    """Add a brand-new tenant/website -- no code change or redeploy needed.
+    Generates a site_id from the name, stores config in the DB, builds a
+    fresh (core-only) search index for it, and shows the embed snippet."""
+    name = (request.form.get("name") or "").strip()
+    primary_color = request.form.get("primary_color") or "#a41e22"
+    dark_color = request.form.get("dark_color") or "#14324f"
+    greeting = (request.form.get("greeting") or "👋 Hello! How can we assist you today?").strip()
+    quick_replies_raw = request.form.get("quick_replies") or ""
+    quick_replies = [q.strip() for q in quick_replies_raw.split(",") if q.strip()]
+    if not quick_replies or not any("human" in q.lower() for q in quick_replies):
+        quick_replies.append("💬 Chat with Human")
+
+    if not name:
+        return redirect(url_for("admin_dashboard"))
+
+    base_slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-") or "site"
+    site_id = base_slug
+    with dbm.get_db() as s:
+        suffix = 1
+        while s.get(Site, site_id):
+            suffix += 1
+            site_id = f"{base_slug}-{suffix}"
+
+        s.add(Site(
+            site_id=site_id, name=name, primary_color=primary_color,
+            dark_color=dark_color, greeting=greeting, quick_replies=quick_replies
+        ))
+        s.commit()
+
+    reload_sites_cache()
+    rebuild_search_index(site_id)
+
+    return redirect(url_for("admin_dashboard", new_site=site_id))
 
 
 if __name__ == "__main__":

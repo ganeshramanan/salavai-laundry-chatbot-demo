@@ -27,7 +27,7 @@
     dark: "#14324f",
     name: "Customer Support",
     greeting: "👋 Hello! How can we assist you today?",
-    quickReplies: ["Pricing", "💬 Talk to Human"]
+    quickReplies: ["Pricing", "💬 Chat with Human"]
   };
 
   // 2. Inject CSS
