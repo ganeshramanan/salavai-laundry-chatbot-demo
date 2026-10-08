@@ -14,11 +14,25 @@
   }
   header h1 { font-size: 18px; margin: 0; }
   header a { color: #ffd166; font-size: 13px; text-decoration: none; }
-  .wrap { max-width: 900px; margin: 32px auto; padding: 0 24px; }
+  .wrap { max-width: 900px; margin: 0 auto; padding: 0 24px 40px; }
   .card { background: #fff; border-radius: 12px; padding: 24px; margin-bottom: 24px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
   .card h2 { font-size: 16px; margin-top: 0; margin-bottom: 6px; }
   .card .sub { font-size: 13px; color: #6b7280; margin-bottom: 16px; }
   .stat { font-size: 28px; font-weight: 800; color: var(--primary); }
+
+  /* Tabs */
+  .tab-bar {
+    background: #fff; border-bottom: 1px solid #e5e7eb; position: sticky; top: 0; z-index: 10;
+    display: flex; gap: 4px; padding: 0 24px; max-width: 900px; margin: 0 auto;
+    overflow-x: auto;
+  }
+  .tab-btn {
+    background: none; border: none; padding: 14px 18px; font-size: 13px; font-weight: 600;
+    color: #6b7280; cursor: pointer; border-bottom: 3px solid transparent; white-space: nowrap;
+  }
+  .tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); }
+  .tab-panel { display: none; padding-top: 24px; }
+  .tab-panel.active { display: block; }
 
   input[type="text"], textarea {
     width: 100%; padding: 10px 14px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px;
@@ -30,6 +44,8 @@
     font-weight: 700; cursor: pointer; font-size: 13px;
   }
   button:hover { opacity: 0.9; }
+  button.danger { background: #fff; color: #dc2626; border: 1px solid #dc2626; padding: 6px 12px; font-size: 12px; }
+  button.danger:hover { background: #fef2f2; }
 
   select {
     width: 100%; padding: 10px 14px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px;
@@ -74,6 +90,7 @@
   }
   .site-row .swatch { width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0; }
   .site-row code { background: #e2e8f0; padding: 2px 6px; border-radius: 5px; font-size: 11px; }
+  .site-row .protected-tag { font-size: 10px; color: #9ca3af; font-weight: 600; }
 
   .form-row { margin-bottom: 14px; }
   .form-row label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 4px; }
@@ -97,146 +114,202 @@
   <a href="/admin/logout">Log out</a>
 </header>
 
+<nav class="tab-bar">
+  <button class="tab-btn active" data-tab="sites">🌐 Websites</button>
+  <button class="tab-btn" data-tab="kb">📚 Knowledge Base</button>
+  <button class="tab-btn" data-tab="leads">📊 Lead Report</button>
+  <button class="tab-btn" data-tab="settings">⚙️ Settings</button>
+</nav>
+
 <div class="wrap">
 
   {% if new_site %}
-  <div class="snippet-banner">
+  <div class="snippet-banner" style="margin-top:24px;">
     <div class="title">✅ New website added! Paste this snippet on the new site to go live immediately — no code change or redeploy needed:</div>
     <code>&lt;script src="{{ base_url }}/widget.js" data-site="{{ new_site }}"&gt;&lt;/script&gt;</code>
   </div>
   {% endif %}
 
-  <div class="card">
-    <h2>🌐 Websites / Tenants</h2>
-    <div class="sub">Every site below can receive the chatbot via the embed snippet. Add a new website anytime — no code change or redeploy required.</div>
+  <!-- Tab: Websites / Tenants -->
+  <div class="tab-panel active" id="tab-sites">
+    <div class="card">
+      <h2>🌐 Websites / Tenants</h2>
+      <div class="sub">Every site below can receive the chatbot via the embed snippet. Add a new website anytime — no code change or redeploy required.</div>
 
-    <div class="site-list">
-      {% for site_id, cfg in sites.items() %}
-      <div class="site-row">
-        <span class="swatch" style="background: {{ cfg.primary_color }};"></span>
-        <div style="flex:1;">
-          <strong>{{ cfg.name }}</strong><br>
-          <code>data-site="{{ site_id }}"</code>
-        </div>
-      </div>
-      {% endfor %}
-    </div>
-
-    <form action="/admin/sites/add" method="POST">
-      <div class="form-row">
-        <label>Website / Business Name</label>
-        <input type="text" name="name" placeholder="e.g. Hari's Second Laundry Shop" required>
-      </div>
-      <div class="color-row">
-        <div>
-          <label>Primary Color</label>
-          <input type="color" name="primary_color" value="#a41e22">
-        </div>
-        <div>
-          <label>Dark/Header Color</label>
-          <input type="color" name="dark_color" value="#14324f">
-        </div>
-      </div>
-      <div class="form-row">
-        <label>Greeting Message</label>
-        <input type="text" name="greeting" placeholder="👋 Welcome! How can we help you today?">
-      </div>
-      <div class="form-row">
-        <label>Quick Replies (comma-separated)</label>
-        <input type="text" name="quick_replies" placeholder="Pricing, Store hours, 💬 Chat with Human">
-      </div>
-      <button type="submit">+ Add New Website</button>
-    </form>
-  </div>
-
-  <div class="card">
-    <h2>📚 Knowledge Base</h2>
-    <div class="sub">Core FAQs ({{ core_count }} entries) are shared across every site automatically. Site-specific uploads only train that one site's bot.</div>
-    <div class="kb-breakdown">
-      {% for site_id, cfg in sites.items() %}
-      <div class="kb-pill">{{ cfg.name }}: <b>{{ kb_counts[site_id] }}</b> entries</div>
-      {% endfor %}
-    </div>
-    <form action="/admin/upload" method="POST" enctype="multipart/form-data">
-      <label style="font-size:13px; font-weight:600;">Upload knowledge for:</label>
-      <select name="site_id">
+      <div class="site-list">
         {% for site_id, cfg in sites.items() %}
-        <option value="{{ site_id }}">{{ cfg.name }}</option>
-        {% endfor %}
-      </select>
-      <label style="font-size:13px; font-weight:600;">Upload a Word (.docx) or PDF document to add more knowledge:</label><br><br>
-      <input type="file" name="document" accept=".docx,.pdf" required>
-      <button type="submit">Upload & Train Bot</button>
-    </form>
-  </div>
-
-  <div class="card">
-    <h2>📧 Notification Emails</h2>
-    <div class="sub">These addresses receive an email every time a franchise lead completes the chat flow. Separate multiple emails with commas.</div>
-    <form action="/admin/emails" method="POST">
-      <input type="text" name="emails" value="{{ emails|join(', ') }}" placeholder="e.g. owner@example.com, partner@example.com">
-      <button type="submit">Save Emails</button>
-    </form>
-  </div>
-
-  <div class="card">
-    <h2>📊 Lead Report</h2>
-    <div class="sub">Combines franchise/partner leads and "💬 Chat with Human" live-chat requests — the two billable lead types.</div>
-
-    <div class="range-pill">
-      <a href="/admin?range=all" class="{{ 'active' if range_key == 'all' else '' }}">All Time</a>
-      <a href="/admin?range=week" class="{{ 'active' if range_key == 'week' else '' }}">Last 7 Days</a>
-      <a href="/admin?range=month" class="{{ 'active' if range_key == 'month' else '' }}">Last 30 Days</a>
-    </div>
-    <form class="filter-bar" method="GET" action="/admin">
-      <input type="hidden" name="range" value="custom">
-      <label style="font-size:12px; color:#6b7280;">Custom range:</label>
-      <input type="date" name="start_date" value="{{ start_date }}">
-      <span style="font-size:12px; color:#6b7280;">to</span>
-      <input type="date" name="end_date" value="{{ end_date }}">
-      <button type="submit">Apply</button>
-    </form>
-
-    <div class="sub">Total leads in range: <span class="stat">{{ total_leads }}</span></div>
-
-    <div class="breakdown-grid">
-      {% for site_id, cfg in sites.items() %}
-      <div class="breakdown-card">
-        <div class="site-name">{{ cfg.name }}</div>
-        <div class="counts">
-          🤝 Franchise: <b>{{ site_breakdown.get(site_id, {}).get('franchise', 0) }}</b>
-          &nbsp;·&nbsp;
-          💬 Live Chat: <b>{{ site_breakdown.get(site_id, {}).get('live_chat', 0) }}</b>
+        <div class="site-row">
+          <span class="swatch" style="background: {{ cfg.primary_color }};"></span>
+          <div style="flex:1;">
+            <strong>{{ cfg.name }}</strong>
+            {% if site_id in protected_site_ids %}<span class="protected-tag">· default site</span>{% endif %}
+            <br>
+            <code>data-site="{{ site_id }}"</code>
+          </div>
+          {% if site_id not in protected_site_ids %}
+          <form action="/admin/sites/delete" method="POST" onsubmit="return confirm('Remove {{ cfg.name }}? This also deletes its site-specific knowledge base entries.');">
+            <input type="hidden" name="site_id" value="{{ site_id }}">
+            <button type="submit" class="danger">Remove</button>
+          </form>
+          {% endif %}
         </div>
-      </div>
-      {% endfor %}
-    </div>
-
-    {% if filtered_leads|length > 0 %}
-    <table>
-      <thead><tr><th>Date</th><th>Type</th><th>Site</th><th>Details</th></tr></thead>
-      <tbody>
-        {% for lead in filtered_leads %}
-        <tr>
-          <td>{{ lead.date_str }}</td>
-          <td><span class="lead-type-tag {{ lead.type }}">{{ 'Franchise' if lead.type == 'franchise' else 'Live Chat' }}</span></td>
-          <td>{{ lead.site_name or lead.site_id or '—' }}</td>
-          <td>
-            {% if lead.type == 'franchise' %}
-              {{ lead.name }} · {{ lead.city }} · {{ lead.budget }}
-            {% else %}
-              "{{ lead.message }}"
-            {% endif %}
-          </td>
-        </tr>
         {% endfor %}
-      </tbody>
-    </table>
-    {% else %}
-      <div class="empty">No leads in this range.</div>
-    {% endif %}
+      </div>
+
+      <form action="/admin/sites/add" method="POST">
+        <div class="form-row">
+          <label>Website / Business Name</label>
+          <input type="text" name="name" placeholder="e.g. Hari's Second Laundry Shop" required>
+        </div>
+        <div class="color-row">
+          <div>
+            <label>Primary Color</label>
+            <input type="color" name="primary_color" value="#a41e22">
+          </div>
+          <div>
+            <label>Dark/Header Color</label>
+            <input type="color" name="dark_color" value="#14324f">
+          </div>
+        </div>
+        <div class="form-row">
+          <label>Greeting Message</label>
+          <input type="text" name="greeting" placeholder="👋 Welcome! How can we help you today?">
+        </div>
+        <div class="form-row">
+          <label>Quick Replies (comma-separated)</label>
+          <input type="text" name="quick_replies" placeholder="Pricing, Store hours, 💬 Chat with Human">
+        </div>
+        <button type="submit">+ Add New Website</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Tab: Knowledge Base -->
+  <div class="tab-panel" id="tab-kb">
+    <div class="card">
+      <h2>📚 Knowledge Base</h2>
+      <div class="sub">Core FAQs ({{ core_count }} entries) are shared across every site automatically. Site-specific uploads only train that one site's bot.</div>
+      <div class="kb-breakdown">
+        {% for site_id, cfg in sites.items() %}
+        <div class="kb-pill">{{ cfg.name }}: <b>{{ kb_counts[site_id] }}</b> entries</div>
+        {% endfor %}
+      </div>
+      <form action="/admin/upload" method="POST" enctype="multipart/form-data">
+        <label style="font-size:13px; font-weight:600;">Upload knowledge for:</label>
+        <select name="site_id">
+          {% for site_id, cfg in sites.items() %}
+          <option value="{{ site_id }}">{{ cfg.name }}</option>
+          {% endfor %}
+        </select>
+        <label style="font-size:13px; font-weight:600;">Upload a Word (.docx) or PDF document to add more knowledge:</label><br><br>
+        <input type="file" name="document" accept=".docx,.pdf" required>
+        <button type="submit">Upload & Train Bot</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Tab: Lead Report -->
+  <div class="tab-panel" id="tab-leads">
+    <div class="card">
+      <h2>📊 Lead Report</h2>
+      <div class="sub">Combines franchise/partner leads and "💬 Chat with Human" live-chat requests — the two billable lead types.</div>
+
+      <div class="range-pill">
+        <a href="/admin?range=all" class="{{ 'active' if range_key == 'all' else '' }}">All Time</a>
+        <a href="/admin?range=week" class="{{ 'active' if range_key == 'week' else '' }}">Last 7 Days</a>
+        <a href="/admin?range=month" class="{{ 'active' if range_key == 'month' else '' }}">Last 30 Days</a>
+      </div>
+      <form class="filter-bar" method="GET" action="/admin">
+        <input type="hidden" name="range" value="custom">
+        <label style="font-size:12px; color:#6b7280;">Custom range:</label>
+        <input type="date" name="start_date" value="{{ start_date }}">
+        <span style="font-size:12px; color:#6b7280;">to</span>
+        <input type="date" name="end_date" value="{{ end_date }}">
+        <button type="submit">Apply</button>
+      </form>
+
+      <div class="sub">Total leads in range: <span class="stat">{{ total_leads }}</span></div>
+
+      <div class="breakdown-grid">
+        {% for site_id, cfg in sites.items() %}
+        <div class="breakdown-card">
+          <div class="site-name">{{ cfg.name }}</div>
+          <div class="counts">
+            🤝 Franchise: <b>{{ site_breakdown.get(site_id, {}).get('franchise', 0) }}</b>
+            &nbsp;·&nbsp;
+            💬 Live Chat: <b>{{ site_breakdown.get(site_id, {}).get('live_chat', 0) }}</b>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+
+      {% if filtered_leads|length > 0 %}
+      <table>
+        <thead><tr><th>Date</th><th>Type</th><th>Site</th><th>Details</th></tr></thead>
+        <tbody>
+          {% for lead in filtered_leads %}
+          <tr>
+            <td>{{ lead.date_str }}</td>
+            <td><span class="lead-type-tag {{ lead.type }}">{{ 'Franchise' if lead.type == 'franchise' else 'Live Chat' }}</span></td>
+            <td>{{ lead.site_name or lead.site_id or '—' }}</td>
+            <td>
+              {% if lead.type == 'franchise' %}
+                {{ lead.name }} · {{ lead.city }} · {{ lead.budget }}
+              {% else %}
+                "{{ lead.message }}"
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+        <div class="empty">No leads in this range.</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Tab: Settings -->
+  <div class="tab-panel" id="tab-settings">
+    <div class="card">
+      <h2>📧 Notification Emails</h2>
+      <div class="sub">These addresses receive an email every time a franchise lead completes the chat flow. Separate multiple emails with commas.</div>
+      <form action="/admin/emails" method="POST">
+        <input type="text" name="emails" value="{{ emails|join(', ') }}" placeholder="e.g. owner@example.com, partner@example.com">
+        <button type="submit">Save Emails</button>
+      </form>
+    </div>
   </div>
 
 </div>
+
+<script>
+  const tabButtons = document.querySelectorAll(".tab-btn");
+  const tabPanels = document.querySelectorAll(".tab-panel");
+
+  function activateTab(tabName) {
+    tabButtons.forEach(btn => btn.classList.toggle("active", btn.dataset.tab === tabName));
+    tabPanels.forEach(panel => panel.classList.toggle("active", panel.id === "tab-" + tabName));
+    if (history.replaceState) {
+      const url = new URL(window.location);
+      url.searchParams.set("tab", tabName);
+      history.replaceState(null, "", url);
+    }
+  }
+
+  tabButtons.forEach(btn => {
+    btn.addEventListener("click", () => activateTab(btn.dataset.tab));
+  });
+
+  // Restore last-active tab from URL (?tab=leads) or default to "sites".
+  // Also auto-switch to Lead Report if a date-range filter was just applied,
+  // and to Websites if a new site was just added.
+  const params = new URLSearchParams(window.location.search);
+  let initialTab = params.get("tab");
+  if (!initialTab && (params.get("range") || params.get("start_date"))) initialTab = "leads";
+  if (!initialTab && params.get("new_site")) initialTab = "sites";
+  if (initialTab) activateTab(initialTab);
+</script>
+
 </body>
 </html>

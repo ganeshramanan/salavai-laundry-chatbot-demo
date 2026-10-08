@@ -712,6 +712,7 @@ def admin_dashboard():
             end_date=end_date,
             new_site=request.args.get("new_site"),
             base_url=request.url_root.rstrip("/"),
+            protected_site_ids=PROTECTED_SITE_IDS,
         )
 
 
@@ -795,6 +796,39 @@ def admin_add_site():
     rebuild_search_index(site_id)
 
     return redirect(url_for("admin_dashboard", new_site=site_id))
+
+
+# Sites that ship with the product by default -- protected from accidental
+# deletion via the dashboard. Someone can still remove them manually in the
+# DB if truly needed, but the UI won't offer a one-click delete for these.
+PROTECTED_SITE_IDS = {"salavai", "pos", "ecommerce", "franchise"}
+
+
+@app.route("/admin/sites/delete", methods=["POST"])
+@require_admin_login
+def admin_delete_site():
+    """Remove a tenant/website added via the dashboard. Also cleans up its
+    site-specific knowledge base entries. Does not touch core KB, and
+    refuses to delete the 4 default Salavai sites to avoid accidental
+    breakage of the main demo/product sites."""
+    site_id = request.form.get("site_id", "")
+
+    if site_id in PROTECTED_SITE_IDS:
+        return redirect(url_for("admin_dashboard"))
+
+    with dbm.get_db() as s:
+        site = s.get(Site, site_id)
+        if site:
+            s.query(KnowledgeEntry).filter(KnowledgeEntry.site_id == site_id).delete()
+            s.delete(site)
+            s.commit()
+
+    _vectorizers.pop(site_id, None)
+    _kb_vectors.pop(site_id, None)
+    _kb_entries.pop(site_id, None)
+    reload_sites_cache()
+
+    return redirect(url_for("admin_dashboard"))
 
 
 if __name__ == "__main__":
