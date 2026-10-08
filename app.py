@@ -357,7 +357,7 @@ def chat():
             reply = answer
         else:
             reply = ("I'm not fully sure about that yet! Would you like to chat with a live agent? "
-                     "Just tap '💬 Talk to Human' below or let me know!")
+                     "Just tap '💬 Chat with Human' below or let me know!")
 
         s.add(ChatMessage(session_id=session_id, sender="bot", text=reply, time=time.time()))
         s.commit()
