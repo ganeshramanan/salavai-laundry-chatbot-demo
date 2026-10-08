@@ -639,6 +639,33 @@ def admin_dashboard():
             site_count = s.query(KnowledgeEntry).filter(KnowledgeEntry.site_id == site_id).count()
             kb_counts[site_id] = core_count + site_count
 
+        # -----------------------------------------------------------------
+        # Uploaded document batches, per site -- lets the agent see what
+        # was uploaded and remove a specific document's knowledge later
+        # without affecting the shared core FAQs.
+        # -----------------------------------------------------------------
+        uploaded_rows = (
+            s.query(KnowledgeEntry)
+            .filter(KnowledgeEntry.batch_id.isnot(None))
+            .order_by(KnowledgeEntry.uploaded_at.desc())
+            .all()
+        )
+        batches_by_site = {}
+        seen_batches = set()
+        for row in uploaded_rows:
+            key = (row.site_id, row.batch_id)
+            if key in seen_batches:
+                batches_by_site[row.site_id][-1]["chunk_count"] += 1
+                continue
+            seen_batches.add(key)
+            batches_by_site.setdefault(row.site_id, []).append({
+                "batch_id": row.batch_id,
+                "filename": row.filename,
+                "uploaded_at": row.uploaded_at,
+                "uploaded_at_str": datetime.fromtimestamp(row.uploaded_at).strftime("%d %b %Y, %I:%M %p") if row.uploaded_at else "",
+                "chunk_count": 1,
+            })
+
         emails = [row.email for row in s.query(NotifyEmail).all()]
 
         # -----------------------------------------------------------------
@@ -702,6 +729,7 @@ def admin_dashboard():
             sites=get_sites(),
             kb_counts=kb_counts,
             core_count=core_count,
+            batches_by_site=batches_by_site,
             emails=emails,
             leads=[l for l in all_leads if l["type"] == "franchise"],
             filtered_leads=filtered_leads,
@@ -745,6 +773,28 @@ def admin_upload():
         print(f"[admin_upload] Failed to process document: {e}")
 
     return redirect(url_for("admin_dashboard"))
+
+
+@app.route("/admin/kb/delete", methods=["POST"])
+@require_admin_login
+def admin_delete_kb_batch():
+    """Remove a previously uploaded document's knowledge base entries
+    (identified by batch_id) from one site. Core/shared FAQs are never
+    affected -- only ever touches site-specific uploaded entries."""
+    site_id = request.form.get("site_id", "")
+    batch_id = request.form.get("batch_id", "")
+
+    if site_id and batch_id:
+        with dbm.get_db() as s:
+            s.query(KnowledgeEntry).filter(
+                KnowledgeEntry.site_id == site_id,
+                KnowledgeEntry.batch_id == batch_id
+            ).delete()
+            s.commit()
+        if site_id in get_sites():
+            rebuild_search_index(site_id)
+
+    return redirect(url_for("admin_dashboard", tab="kb"))
 
 
 @app.route("/admin/emails", methods=["POST"])
@@ -798,27 +848,26 @@ def admin_add_site():
     return redirect(url_for("admin_dashboard", new_site=site_id))
 
 
-# Sites that ship with the product by default -- protected from accidental
-# deletion via the dashboard. Someone can still remove them manually in the
-# DB if truly needed, but the UI won't offer a one-click delete for these.
-PROTECTED_SITE_IDS = {"salavai", "pos", "ecommerce", "franchise"}
+# NOTE: Previously the 4 default Salavai sites were hard-blocked from
+# deletion. That was overly restrictive for someone managing all tenants
+# themselves -- any site can now be removed, with a confirm() prompt in the
+# UI as the safety net. The only hard rule left: never delete the very last
+# remaining site, so the system always has at least one tenant configured.
+PROTECTED_SITE_IDS = set()
 
 
 @app.route("/admin/sites/delete", methods=["POST"])
 @require_admin_login
 def admin_delete_site():
-    """Remove a tenant/website added via the dashboard. Also cleans up its
-    site-specific knowledge base entries. Does not touch core KB, and
-    refuses to delete the 4 default Salavai sites to avoid accidental
-    breakage of the main demo/product sites."""
+    """Remove a tenant/website. Also cleans up its site-specific knowledge
+    base entries (core KB is untouched). Refuses to delete the last
+    remaining site so the system is never left with zero tenants."""
     site_id = request.form.get("site_id", "")
 
-    if site_id in PROTECTED_SITE_IDS:
-        return redirect(url_for("admin_dashboard"))
-
     with dbm.get_db() as s:
+        total_sites = s.query(Site).count()
         site = s.get(Site, site_id)
-        if site:
+        if site and total_sites > 1:
             s.query(KnowledgeEntry).filter(KnowledgeEntry.site_id == site_id).delete()
             s.delete(site)
             s.commit()

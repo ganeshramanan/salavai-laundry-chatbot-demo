@@ -206,6 +206,36 @@
         <button type="submit">Upload & Train Bot</button>
       </form>
     </div>
+
+    <div class="card">
+      <h2>🗂 Uploaded Documents</h2>
+      <div class="sub">Remove a previously uploaded document's knowledge anytime — this only affects that one site, core FAQs are never touched.</div>
+
+      {% set has_any_upload = batches_by_site.values() | map('length') | sum > 0 %}
+      {% if has_any_upload %}
+      <div class="site-list">
+        {% for site_id, cfg in sites.items() %}
+          {% for batch in batches_by_site.get(site_id, []) %}
+          <div class="site-row">
+            <span class="swatch" style="background: {{ cfg.primary_color }};"></span>
+            <div style="flex:1;">
+              <strong>{{ batch.filename or 'Untitled document' }}</strong> · <span style="color:#6b7280;">{{ cfg.name }}</span><br>
+              <code>{{ batch.chunk_count }} knowledge entries</code>
+              <span style="font-size:11px; color:#9ca3af;">· uploaded {{ batch.uploaded_at_str }}</span>
+            </div>
+            <form action="/admin/kb/delete" method="POST" onsubmit="return confirm('Remove the knowledge from {{ batch.filename or &quot;this document&quot; }}? This cannot be undone.');">
+              <input type="hidden" name="site_id" value="{{ site_id }}">
+              <input type="hidden" name="batch_id" value="{{ batch.batch_id }}">
+              <button type="submit" class="danger">Remove</button>
+            </form>
+          </div>
+          {% endfor %}
+        {% endfor %}
+      </div>
+      {% else %}
+        <div class="empty">No documents uploaded yet.</div>
+      {% endif %}
+    </div>
   </div>
 
   <!-- Tab: Lead Report -->
