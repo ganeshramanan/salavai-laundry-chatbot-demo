@@ -12,6 +12,7 @@ import io
 import time
 import uuid
 import re
+from datetime import datetime
 from email_utils import send_lead_notification
 from document_utils import extract_text_from_file, chunk_text_into_qa_pairs
 from telegram_utils import notify_live_request, notify_visitor_reply, send_telegram_message
@@ -156,6 +157,7 @@ rebuild_all_search_indexes()
 SESSIONS = {}
 TELEGRAM_MSG_TO_SESSION = {}  # telegram_msg_id -> session_id
 franchise_leads = []
+live_chat_leads = []  # one entry per "Talk to Human" request -- a separate billable lead type
 notify_emails = [e.strip() for e in os.environ.get("NOTIFY_EMAIL", "").split(",") if e.strip()]
 
 
@@ -259,6 +261,15 @@ def chat():
             TELEGRAM_MSG_TO_SESSION[msg_id] = session_id
             session_obj["telegram_msg_id"] = msg_id
 
+        live_chat_leads.append({
+            "type": "live_chat",
+            "site_id": site_id,
+            "site_name": site_cfg["name"],
+            "session_id": session_id,
+            "message": message,
+            "time": time.time()
+        })
+
         return jsonify({
             "reply": "Connecting you with our support team... An agent has been notified and will reply here in just a moment!",
             "session_id": session_id,
@@ -323,6 +334,8 @@ def handle_franchise_flow(message, session_obj, session_id):
         lead_record = dict(data)
         lead_record["site_id"] = session_obj.get("site_id", "salavai")
         lead_record["site_name"] = SITES.get(lead_record["site_id"], {}).get("name", lead_record["site_id"])
+        lead_record["time"] = time.time()
+        lead_record["type"] = "franchise"
         franchise_leads.append(lead_record)
         send_lead_notification(data, notify_emails)
 
@@ -507,6 +520,53 @@ def admin_dashboard():
         site_id: len(CORE_KNOWLEDGE_BASE) + len(SITE_KNOWLEDGE_BASE.get(site_id, []))
         for site_id in SITES
     }
+
+    # ---------------------------------------------------------------------
+    # Lead reporting: combine franchise leads + live-chat ("Talk to Human")
+    # leads into one timeline, filterable by range (week/month/custom) and
+    # broken down per site -- supports per-lead billing conversations.
+    # ---------------------------------------------------------------------
+    range_key = request.args.get("range", "all")  # all | week | month | custom
+    start_date = request.args.get("start_date", "")
+    end_date = request.args.get("end_date", "")
+
+    now = time.time()
+    range_start, range_end = None, None
+    if range_key == "week":
+        range_start = now - 7 * 86400
+    elif range_key == "month":
+        range_start = now - 30 * 86400
+    elif range_key == "custom" and start_date:
+        try:
+            range_start = datetime.strptime(start_date, "%Y-%m-%d").timestamp()
+            if end_date:
+                range_end = datetime.strptime(end_date, "%Y-%m-%d").timestamp() + 86400
+        except ValueError:
+            pass
+
+    def in_range(lead):
+        t = lead.get("time", 0)
+        if range_start and t < range_start:
+            return False
+        if range_end and t > range_end:
+            return False
+        return True
+
+    all_leads = (
+        [dict(l, type=l.get("type", "franchise")) for l in franchise_leads] +
+        [dict(l) for l in live_chat_leads]
+    )
+    filtered_leads = [l for l in all_leads if in_range(l)]
+    filtered_leads.sort(key=lambda l: l.get("time", 0), reverse=True)
+    for lead in filtered_leads:
+        lead["date_str"] = datetime.fromtimestamp(lead.get("time", 0)).strftime("%d %b %Y, %I:%M %p")
+
+    site_breakdown = {}
+    for lead in filtered_leads:
+        sid = lead.get("site_id", "salavai")
+        site_breakdown.setdefault(sid, {"franchise": 0, "live_chat": 0})
+        site_breakdown[sid][lead.get("type", "franchise")] += 1
+
     return render_template(
         "admin_dashboard.html",
         sites=SITES,
@@ -514,6 +574,12 @@ def admin_dashboard():
         core_count=len(CORE_KNOWLEDGE_BASE),
         emails=notify_emails,
         leads=franchise_leads,
+        filtered_leads=filtered_leads,
+        total_leads=len(filtered_leads),
+        site_breakdown=site_breakdown,
+        range_key=range_key,
+        start_date=start_date,
+        end_date=end_date,
     )
 
 

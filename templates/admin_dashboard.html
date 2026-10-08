@@ -41,6 +41,27 @@
   }
   .kb-pill b { color: var(--primary); }
 
+  .filter-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 16px; }
+  .filter-bar select, .filter-bar input[type="date"] {
+    width: auto; margin-bottom: 0; padding: 8px 12px; font-size: 13px;
+  }
+  .filter-bar button { padding: 8px 16px; }
+  .range-pill { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; }
+  .range-pill a {
+    text-decoration: none; font-size: 12px; padding: 6px 14px; border-radius: 20px;
+    border: 1px solid #e5e7eb; color: #374151; background: #fff;
+  }
+  .range-pill a.active { background: var(--primary); color: #fff; border-color: var(--primary); font-weight: 700; }
+  .breakdown-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin-bottom: 16px; }
+  .breakdown-card { background: #f8fafc; border-radius: 10px; padding: 12px 14px; }
+  .breakdown-card .site-name { font-size: 12px; font-weight: 700; color: var(--dark); margin-bottom: 4px; }
+  .breakdown-card .counts { font-size: 12px; color: #6b7280; }
+  .lead-type-tag {
+    font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 10px; text-transform: uppercase;
+  }
+  .lead-type-tag.franchise { background: #ede9fe; color: #6d28d9; }
+  .lead-type-tag.live_chat { background: #dbeafe; color: #1d4ed8; }
+
   table { width: 100%; border-collapse: collapse; font-size: 13px; }
   th, td { text-align: left; padding: 8px; border-bottom: 1px solid #eee; }
   th { color: #6b7280; font-size: 11px; text-transform: uppercase; }
@@ -86,25 +107,60 @@
   </div>
 
   <div class="card">
-    <h2>🧾 Captured Franchise Leads</h2>
-    <div class="sub">Total leads: <strong>{{ leads|length }}</strong></div>
-    {% if leads|length > 0 %}
+    <h2>📊 Lead Report</h2>
+    <div class="sub">Combines franchise/partner leads and "💬 Talk to Human" live-chat requests — the two billable lead types.</div>
+
+    <div class="range-pill">
+      <a href="/admin?range=all" class="{{ 'active' if range_key == 'all' else '' }}">All Time</a>
+      <a href="/admin?range=week" class="{{ 'active' if range_key == 'week' else '' }}">Last 7 Days</a>
+      <a href="/admin?range=month" class="{{ 'active' if range_key == 'month' else '' }}">Last 30 Days</a>
+    </div>
+    <form class="filter-bar" method="GET" action="/admin">
+      <input type="hidden" name="range" value="custom">
+      <label style="font-size:12px; color:#6b7280;">Custom range:</label>
+      <input type="date" name="start_date" value="{{ start_date }}">
+      <span style="font-size:12px; color:#6b7280;">to</span>
+      <input type="date" name="end_date" value="{{ end_date }}">
+      <button type="submit">Apply</button>
+    </form>
+
+    <div class="sub">Total leads in range: <span class="stat">{{ total_leads }}</span></div>
+
+    <div class="breakdown-grid">
+      {% for site_id, cfg in sites.items() %}
+      <div class="breakdown-card">
+        <div class="site-name">{{ cfg.name }}</div>
+        <div class="counts">
+          🤝 Franchise: <b>{{ site_breakdown.get(site_id, {}).get('franchise', 0) }}</b>
+          &nbsp;·&nbsp;
+          💬 Live Chat: <b>{{ site_breakdown.get(site_id, {}).get('live_chat', 0) }}</b>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+
+    {% if filtered_leads|length > 0 %}
     <table>
-      <thead><tr><th>Site</th><th>Name</th><th>City</th><th>Experience</th><th>Budget</th></tr></thead>
+      <thead><tr><th>Date</th><th>Type</th><th>Site</th><th>Details</th></tr></thead>
       <tbody>
-        {% for lead in leads %}
+        {% for lead in filtered_leads %}
         <tr>
+          <td>{{ lead.date_str }}</td>
+          <td><span class="lead-type-tag {{ lead.type }}">{{ 'Franchise' if lead.type == 'franchise' else 'Live Chat' }}</span></td>
           <td>{{ lead.site_name or lead.site_id or '—' }}</td>
-          <td>{{ lead.name }}</td>
-          <td>{{ lead.city }}</td>
-          <td>{{ lead.experience }}</td>
-          <td>{{ lead.budget }}</td>
+          <td>
+            {% if lead.type == 'franchise' %}
+              {{ lead.name }} · {{ lead.city }} · {{ lead.budget }}
+            {% else %}
+              "{{ lead.message }}"
+            {% endif %}
+          </td>
         </tr>
         {% endfor %}
       </tbody>
     </table>
     {% else %}
-      <div class="empty">No leads captured yet.</div>
+      <div class="empty">No leads in this range.</div>
     {% endif %}
   </div>
 
