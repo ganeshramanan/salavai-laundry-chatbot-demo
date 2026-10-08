@@ -381,8 +381,52 @@ def telegram_webhook():
     message = update.get("message", {})
     text = message.get("text", "").strip()
     reply_to = message.get("reply_to_message", {})
+    from_user = message.get("from", {})
+    agent_name = from_user.get("first_name") or from_user.get("username") or "An agent"
 
     if not text:
+        return jsonify({"ok": True})
+
+    # ---------------------------------------------------------------------
+    # /claim command: lets an agent explicitly take over a session, even if
+    # another agent already claimed it (e.g. shift handoff). Usage:
+    #   /claim #a1b2c3d4
+    # ---------------------------------------------------------------------
+    claim_match = re.match(r"^/claim\b\s*#?([a-f0-9]{8})?\s*$", text, re.IGNORECASE)
+    if claim_match:
+        claim_session_id = claim_match.group(1).lower() if claim_match.group(1) else None
+
+        if not claim_session_id and reply_to:
+            claim_session_id = TELEGRAM_MSG_TO_SESSION.get(reply_to.get("message_id"))
+
+        if not claim_session_id:
+            active_live = [(sid, sess) for sid, sess in SESSIONS.items() if sess.get("mode") == "live"]
+            if len(active_live) == 1:
+                claim_session_id = active_live[0][0]
+            elif len(active_live) > 1:
+                listing = "\n".join(
+                    f"• <code>{sid}</code> — {SITES.get(sess.get('site_id'), {}).get('name', sess.get('site_id'))}"
+                    for sid, sess in active_live
+                )
+                send_telegram_message(
+                    "⚠️ Multiple live chats are active. Specify which to claim, e.g.:\n"
+                    "<code>/claim #a1b2c3d4</code>\n\n"
+                    f"Active sessions:\n{listing}"
+                )
+                return jsonify({"ok": True})
+
+        if claim_session_id and claim_session_id in SESSIONS:
+            session_obj = SESSIONS[claim_session_id]
+            previous = session_obj.get("claimed_by")
+            session_obj["claimed_by"] = agent_name
+            site_name = SITES.get(session_obj.get("site_id"), {}).get("name", session_obj.get("site_id"))
+            if previous and previous != agent_name:
+                send_telegram_message(f"🔁 <b>{agent_name}</b> has taken over session <code>{claim_session_id}</code> ({site_name}) from {previous}.")
+            else:
+                send_telegram_message(f"✋ <b>{agent_name}</b> is now handling session <code>{claim_session_id}</code> ({site_name}).")
+        else:
+            send_telegram_message("⚠️ Could not find that session to claim. Use <code>/claim #session_id</code>.")
+
         return jsonify({"ok": True})
 
     # ---------------------------------------------------------------------
@@ -417,6 +461,7 @@ def telegram_webhook():
         if close_session_id and close_session_id in SESSIONS:
             session_obj = SESSIONS[close_session_id]
             session_obj["mode"] = "bot"
+            session_obj["claimed_by"] = None
             site_name = SITES.get(session_obj.get("site_id"), {}).get("name", session_obj.get("site_id"))
             session_obj["pending_agent_replies"].append({
                 "text": "Thanks for chatting with our support team! I'm back to help with any other questions. 😊",
@@ -464,6 +509,26 @@ def telegram_webhook():
 
     if target_session_id and target_session_id in SESSIONS:
         session_obj = SESSIONS[target_session_id]
+        site_name = SITES.get(session_obj.get("site_id"), {}).get("name", session_obj.get("site_id"))
+
+        # ---------------------------------------------------------------
+        # Claim check: first agent to reply "owns" this session. If a
+        # DIFFERENT agent tries to reply afterwards, warn instead of
+        # silently delivering -- prevents two agents double-replying to
+        # the same customer. Use /claim #session_id to override.
+        # ---------------------------------------------------------------
+        claimed_by = session_obj.get("claimed_by")
+        if claimed_by and claimed_by != agent_name:
+            send_telegram_message(
+                f"⚠️ Session <code>{target_session_id}</code> ({site_name}) is already being handled by "
+                f"<b>{claimed_by}</b>. Your message was NOT sent to avoid double-replying.\n\n"
+                f"If you need to take over, reply with <code>/claim #{target_session_id}</code> first."
+            )
+            return jsonify({"ok": True})
+
+        if not claimed_by:
+            session_obj["claimed_by"] = agent_name
+
         session_obj["pending_agent_replies"].append({
             "text": text,
             "sender": "agent",
@@ -474,8 +539,7 @@ def telegram_webhook():
             "sender": "agent",
             "time": time.time()
         })
-        site_name = SITES.get(session_obj.get("site_id"), {}).get("name", session_obj.get("site_id"))
-        send_telegram_message(f"✅ Delivered to <b>{site_name}</b> (session <code>{target_session_id}</code>): \"{text}\"")
+        send_telegram_message(f"✅ Delivered to <b>{site_name}</b> (session <code>{target_session_id}</code>) — handled by <b>{session_obj['claimed_by']}</b>: \"{text}\"")
     else:
         send_telegram_message("⚠️ Could not match this reply to an active customer session. Use reply-to or start message with <code>#session_id message</code>.")
 
