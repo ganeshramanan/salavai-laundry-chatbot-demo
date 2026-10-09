@@ -848,6 +848,37 @@ def admin_add_site():
     return redirect(url_for("admin_dashboard", new_site=site_id))
 
 
+@app.route("/admin/sites/edit", methods=["POST"])
+@require_admin_login
+def admin_edit_site():
+    """Edit an existing site's branding/greeting/quick-replies in place.
+    Does not change the site_id, so the embed snippet already given to a
+    client keeps working after the edit."""
+    site_id = request.form.get("site_id", "")
+    name = (request.form.get("name") or "").strip()
+    primary_color = request.form.get("primary_color") or "#a41e22"
+    dark_color = request.form.get("dark_color") or "#14324f"
+    greeting = (request.form.get("greeting") or "👋 Hello! How can we assist you today?").strip()
+    quick_replies_raw = request.form.get("quick_replies") or ""
+    quick_replies = [q.strip() for q in quick_replies_raw.split(",") if q.strip()]
+    if not quick_replies or not any("human" in q.lower() for q in quick_replies):
+        quick_replies.append("💬 Chat with Human")
+
+    if site_id and name:
+        with dbm.get_db() as s:
+            site = s.get(Site, site_id)
+            if site:
+                site.name = name
+                site.primary_color = primary_color
+                site.dark_color = dark_color
+                site.greeting = greeting
+                site.quick_replies = quick_replies
+                s.commit()
+        reload_sites_cache()
+
+    return redirect(url_for("admin_dashboard"))
+
+
 # NOTE: Previously the 4 default Salavai sites were hard-blocked from
 # deletion. That was overly restrictive for someone managing all tenants
 # themselves -- any site can now be removed, with a confirm() prompt in the

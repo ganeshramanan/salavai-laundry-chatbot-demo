@@ -46,6 +46,9 @@
   button:hover { opacity: 0.9; }
   button.danger { background: #fff; color: #dc2626; border: 1px solid #dc2626; padding: 6px 12px; font-size: 12px; }
   button.danger:hover { background: #fef2f2; }
+  button.secondary { background: #fff; color: #374151; border: 1px solid #d1d5db; padding: 6px 12px; font-size: 12px; margin-right: 6px; }
+  button.secondary:hover { background: #f9fafb; }
+  .edit-row { background: #f8fafc; border-radius: 10px; padding: 16px; margin: -4px 0 10px 0; }
 
   select {
     width: 100%; padding: 10px 14px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px;
@@ -146,12 +149,43 @@
             <br>
             <code>data-site="{{ site_id }}"</code>
           </div>
+          <button type="button" class="secondary" onclick="toggleEdit('{{ site_id }}')">Edit</button>
           {% if site_id not in protected_site_ids %}
           <form action="/admin/sites/delete" method="POST" onsubmit="return confirm('Remove {{ cfg.name }}? This also deletes its site-specific knowledge base entries.');">
             <input type="hidden" name="site_id" value="{{ site_id }}">
             <button type="submit" class="danger">Remove</button>
           </form>
           {% endif %}
+        </div>
+
+        <div class="edit-row" id="edit-{{ site_id }}" style="display:none;">
+          <form action="/admin/sites/edit" method="POST">
+            <input type="hidden" name="site_id" value="{{ site_id }}">
+            <div class="form-row">
+              <label>Website / Business Name</label>
+              <input type="text" name="name" value="{{ cfg.name }}" required>
+            </div>
+            <div class="color-row">
+              <div>
+                <label>Primary Color</label>
+                <input type="color" name="primary_color" value="{{ cfg.primary_color }}">
+              </div>
+              <div>
+                <label>Dark/Header Color</label>
+                <input type="color" name="dark_color" value="{{ cfg.dark_color }}">
+              </div>
+            </div>
+            <div class="form-row">
+              <label>Greeting Message</label>
+              <input type="text" name="greeting" value="{{ cfg.greeting }}">
+            </div>
+            <div class="form-row">
+              <label>Quick Replies (comma-separated)</label>
+              <input type="text" name="quick_replies" value="{{ cfg.quick_replies|join(', ') }}">
+            </div>
+            <button type="submit">Save Changes</button>
+            <button type="button" class="secondary" onclick="toggleEdit('{{ site_id }}')">Cancel</button>
+          </form>
         </div>
         {% endfor %}
       </div>
@@ -315,6 +349,11 @@
 </div>
 
 <script>
+  function toggleEdit(siteId) {
+    const row = document.getElementById("edit-" + siteId);
+    if (row) row.style.display = row.style.display === "none" ? "block" : "none";
+  }
+
   const tabButtons = document.querySelectorAll(".tab-btn");
   const tabPanels = document.querySelectorAll(".tab-panel");
 
